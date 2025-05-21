@@ -131,8 +131,6 @@ if not st.session_state.logged_in: # Display login/signup form if not logged in
 
         # Social login buttons (placeholders for now)
         st.markdown('<div class="social-login-buttons">', unsafe_allow_html=True)
-        # You'll need to handle image loading (e.g., base64 encoding from app.py or direct web URL)
-        # For now, using text placeholders.
         st.markdown('<div class="social-icon-button">F</div>', unsafe_allow_html=True)
         st.markdown('<div class="social-icon-button">G</div>', unsafe_allow_html=True)
         st.markdown('<div class="social-icon-button">A</div>', unsafe_allow_html=True)
@@ -177,15 +175,3 @@ else: # Already logged in on this page
     st.success(f"이미 로그인되어 있습니다, {st.session_state.username}님! 이미지 분석 페이지로 이동합니다.")
     st.info("잠시 후 이미지 분석 페이지로 자동 이동합니다.")
     st.switch_page("pages/page_2.py") # Automatically switch to page_2.py
-
-# No need to manage temp_credentials_path here, it's handled in app.py
-3. pages/page_2.py (이미지 분석 페이지) 내용:
-
-이 파일은 이제 로그인 후 사용자가 접근하는 핵심 기능 페이지가 됩니다. st.session_state를 통해 로그인 상태를 확인하고, 로그인되지 않았다면 로그인 페이지로 리디렉션하는 로직을 추가하는 것이 좋습니다.
-
-# 로그아웃 버튼
-if logged_in:
-    if st.button("로그아웃"):
-        st.session_state.logged_in = False
-        st.session_state.username = None
-        st.rerun() # 로그아웃 후 페이지 다시 로드
