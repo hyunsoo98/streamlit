@@ -45,14 +45,16 @@ def apply_custom_css():
     }
 
 
-    /* 로고 이미지와 텍스트를 감싸는 컨테이너 */
-    .logo-elements-wrapper {
-        display: flex;
-        flex-direction: column; /* 이미지와 텍스트를 세로로 쌓음 */
-        justify-content: center; /* 수직 중앙 정렬 */
-        align-items: center; /* 수평 중앙 정렬 */
-        margin-bottom: 20px; /* 아래 내용과의 간격 */
-    }
+.logo-elements-wrapper {
+    display: flex; /* flex 컨테이너로 설정 */
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: fit-content; /* 또는 고정 너비. 내용물만큼 너비를 가짐 */
+    margin-left: auto; /* 이 래퍼 자체를 중앙 정렬 */
+    margin-right: auto;
+    margin-bottom: 20px;
+}
 
     /* CareBite 텍스트 스타일 */
     .carebite-text {
