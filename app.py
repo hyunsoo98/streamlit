@@ -185,4 +185,4 @@ st.write("")
 st.write("---")
 
 st.markdown("---")
-st.write("이 애플리케이션은 Google Cloud Vision API 및 제공된 데이터 처리 로
+st.write("이 애플리케이션은 Google Cloud Vision API 및 제공된 데이터 처리 로직을 사용합니다.")
