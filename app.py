@@ -6,6 +6,7 @@ import json
 import re
 import pandas as pd
 import numpy as np
+import base64 # <-- 이 부분을 추가해야 합니다.
 
 # st.set_page_config는 항상 첫 번째 Streamlit 명령이어야 합니다.
 st.set_page_config(
@@ -14,6 +15,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed" # 사이드바 초기 상태 (필요에 따라 변경)
 )
 
+# ... (나머지 코드 동일)
 def apply_custom_css():
     st.markdown("""
     <style>
