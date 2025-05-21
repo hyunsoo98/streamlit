@@ -1,4 +1,5 @@
 import streamlit as st
+from google.cloud import vision
 import os
 import json
 import base64
