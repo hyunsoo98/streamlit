@@ -6,10 +6,7 @@ import json
 import re # 정규표현식 라이브러리 임포트
 import pandas as pd # 데이터 처리를 위한 pandas 임포트
 import numpy as np # prepare_model_input에서 np.nan 사용 가능성을 위해 임포트
-# page_1.py
-import streamlit as st
-st.title("Welcome to Page 1!")
-st.write("This is the image analysis page.")
+
 # 다른 복잡한 로직은 일단 주석 처리하거나 제거
 # --- Vision API 클라이언트와 임시 인증 파일 경로를 session_state에서 가져오기 ---
 # app.py에서 초기화된 client를 사용합니다.
