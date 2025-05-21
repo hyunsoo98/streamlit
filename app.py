@@ -7,7 +7,11 @@ import re
 import pandas as pd
 import numpy as np
 
-# --- Creatie.ai CSS 적용 시작 ---
+# --- 1. st.set_page_config()를 맨 위로 이동 ---
+st.set_page_config(page_title="이미지 건강 데이터 추출 및 분석", layout="centered")
+
+
+# --- Creatie.ai CSS 적용 함수 정의 (호출은 아래에서) ---
 def apply_creatie_css():
     st.markdown("""
     <style>
@@ -15,8 +19,6 @@ def apply_creatie_css():
     .stApp {
         background-color: #38ADA9; /* welcome의 background */
         font-family: "Poppins", sans-serif; /* carebite의 폰트 */
-        /* width와 height는 Streamlit 앱 전체에 고정하기 어려우므로 적용하지 않음.
-           반응형 디자인을 위해 Streamlit의 기본 레이아웃을 따르도록 함. */
         overflow-x: hidden; /* 가로 스크롤 방지 */
     }
 
@@ -27,22 +29,16 @@ def apply_creatie_css():
     }
 
     /* 로고 컨테이너 (logo 클래스 역할) */
-    /* Streamlit에서 absolute position은 사용하기 어려우므로,
-       가운데 정렬 등의 다른 방식으로 로고를 배치하는 것을 고려합니다.
-       여기서는 flexbox를 이용한 가운데 정렬을 시도합니다. */
     .logo-container {
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        width: 100%; /* Streamlit 컨테이너에 맞춰 너비 설정 */
-        /* padding-top은 실제 디자인에 따라 조절. 원래 368px은 너무 김 */
+        width: 100%;
         padding-top: 20px; /* 상단 여백 (조절 가능) */
         padding-bottom: 20px; /* 하단 여백 (조절 가능) */
         row-gap: 5px;
         column-gap: 5px;
-        /* absolute position 관련 CSS는 Streamlit에 직접 적용하기 어려움 */
-        /* top: calc(100% - 812px + 368px); left: calc(100% - 375px + 116.5px); */
     }
 
     /* CareBite 텍스트 스타일 (carebite 클래스 역할) */
@@ -52,24 +48,17 @@ def apply_creatie_css():
         font-size: 32px;
         line-height: 37.44px;
         font-weight: 600;
-        white-space: nowrap; /* 개행 방지 */
-        flex-shrink: 0; /* flex 컨테이너 내에서 크기 축소 방지 */
+        white-space: nowrap;
+        flex-shrink: 0;
     }
 
     /* group-1 스타일 (이 부분은 Streamlit에서 직접 매핑하기 어려움) */
-    /* 이 클래스는 특정 HTML 요소에 직접 적용되어야 하지만,
-       Streamlit의 기본 레이아웃에서 고정 위치의 작은 그룹은 이미지로 처리하거나,
-       복잡한 커스텀 컴포넌트를 사용해야 합니다.
-       여기서는 시각적 구분을 위해 임시 배경색과 크기만 적용합니다.
-       실제 애플리케이션에서는 이 부분을 이미지로 대체하거나 다른 방식으로 구현해야 합니다. */
     .group-1-style {
-        position: absolute; top: 299px; left: 158px;
         width: 48px;
         height: 76px;
-        /* background-color: rgba(255, 255, 255, 0.2); */ /* 시각적 확인을 위한 임시 배경 (주석 처리) */
-        margin-left: auto; /* 가운데 정렬 또는 특정 위치 조정 시 사용 */
+        margin-left: auto;
         margin-right: auto;
-        display: block; /* 블록 요소로 중앙 정렬 */
+        display: block;
     }
 
     /* Streamlit의 기본 버튼 스타일 변경 (선택 사항) */
@@ -96,32 +85,26 @@ def apply_creatie_css():
         font-family: "Poppins", sans-serif;
     }
 
-    Google Fonts Poppins 임포트
+    /* Google Fonts Poppins 임포트 */
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
 
     </style>
     """, unsafe_allow_html=True)
 
-# CSS 적용 함수 호출
+# --- 2. CSS 적용 함수 호출 (set_page_config 아래) ---
 apply_creatie_css()
-# --- Creatie.ai CSS 적용 끝 ---
-
-
-# 페이지 설정
-st.set_page_config(page_title="이미지 건강 데이터 추출 및 분석", layout="centered")
 
 # 기존 st.title 및 st.write 대신 커스텀 CSS 적용을 위한 로고 및 제목 섹션
 st.markdown('<div class="logo-container">', unsafe_allow_html=True)
 st.markdown('<p class="carebite-text">CareBite</p>', unsafe_allow_html=True)
-# group-1에 해당하는 요소가 있다면 여기에 추가 (예: 아이콘 이미지)
-# st.markdown('<div class="group-1-style"></div>', unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
-# 나머지 제목 및 설명 (기존의 st.title, st.write는 위에 정의된 h1/p 스타일을 따름)
+# 나머지 제목 및 설명
 st.title("Google Cloud Vision API를 이용한 이미지 건강 데이터 추출 및 분석")
 st.write("건강검진 결과 이미지를 업로드하면 Vision API로 텍스트를 추출하고, 추출된 데이터를 분석하여 고혈압 위험도를 예측합니다.")
 st.write("⚠️ **주의:** 이 앱은 예시 목적으로, 실제 의료 진단에 사용될 수 없습니다. 예측 결과는 참고용입니다.")
 
+# (이하 기존 코드 동일)
 # 임시 인증 파일 경로 초기화 (try 블록 외부에서 정의)
 temp_credentials_path = None
 client = None # Vision API 클라이언트 초기화
