@@ -46,8 +46,8 @@ st.markdown("""
     width: 325px; /* 원본 디자인과 유사한 너비 */
     height: 325px; /* 원본 디자인과 유사한 높이 */
     border-radius: 45px; /* 원본 카드 모서리 둥글게 */
-    box-shadow: 3px 6px 10px 0px rgba(0, 0, 0, 0.1); /* 원본 카드 그림자 */
-    background: #FFFFFF; /* 원본 카드 배경색 */
+    /* box-shadow: 3px 6px 10px 0px rgba(0, 0, 0, 0.1); */ /* 그림자 제거 */
+    /* background: #FFFFFF; */ /* 배경색 제거 */
     
     display: flex; /* 내부 요소 중앙 정렬 */
     justify-content: center;
@@ -211,4 +211,3 @@ st.markdown('<p class="bottom-description-text">고혈압 지수 주의 등급�
 
 st.markdown("---")
 st.write("이 애플리케이션은 Streamlit 디자인 테스트용입니다.")
-
