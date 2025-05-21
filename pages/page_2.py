@@ -46,8 +46,6 @@ st.markdown("""
     width: 325px; /* 원본 디자인과 유사한 너비 */
     height: 325px; /* 원본 디자인과 유사한 높이 */
     border-radius: 45px; /* 원본 카드 모서리 둥글게 */
-    /* box-shadow: 3px 6px 10px 0px rgba(0, 0, 0, 0.1); */ /* 그림자 제거 */
-    /* background: #FFFFFF; */ /* 배경색 제거 */
     
     display: flex; /* 내부 요소 중앙 정렬 */
     justify-content: center;
@@ -68,18 +66,19 @@ st.markdown("""
     z-index: 1;
 }
 
-/* 하단 설명 텍스트 */
-.bottom-description-text {
+/* 하단 설명 텍스트 (새로운 위치 및 스타일) */
+.bottom-description-text-new {
     color: #333333;
     font-family: "Poppins", sans-serif;
     font-size: 16px;
     font-weight: 400;
-    text-align: center;
-    margin-top: 20px; /* 차트와의 간격 */
-    margin-bottom: 20px; /* 하단 여백 */
-    width: 325px; /* 원본 카드 너비에 맞춰 */
-    margin-left: auto; /* 중앙 정렬 */
-    margin-right: auto;
+    text-align: left; /* 왼쪽 정렬로 변경 */
+    position: absolute; /* 절대 위치 */
+    top: 60%; /* 차트의 중앙보다 아래 */
+    left: 10%; /* 왼쪽 여백 */
+    width: 150px; /* 텍스트 너비 */
+    transform: translateY(-50%); /* 세로 중앙 정렬 */
+    z-index: 2; /* 차트 위에 오도록 */
 }
 
 </style>
@@ -133,6 +132,11 @@ def create_circle_chart_svg(value_level="caution", pointer_base64=None):
         # 등급 텍스트 위치 계산 및 삽입 (원의 바깥쪽)
         text_offset_r = 20 # 원 반지름 + 텍스트와의 간격
         text_x, text_y = get_text_point(section["text_angle"], text_offset_r)
+        
+        # "정상" 텍스트의 y 위치 미세 조정
+        if section["label"] == "정상":
+            text_y -= 5 # 약간 위로 이동
+        
         texts.append(f'<text x="{text_x}" y="{text_y}" text-anchor="middle" fill="#333333" font-family="Poppins, sans-serif" font-size="14px" font-weight="500">{section["label"]}</text>')
 
     # 중앙에 흰색 원을 뚫어서 도넛 형태로 만듭니다.
@@ -166,7 +170,6 @@ def create_circle_chart_svg(value_level="caution", pointer_base64=None):
     return svg_content
 
 # --- Streamlit 앱 메인 로직 (이 페이지의 내용) ---
-# 이 페이지는 로그인 정보가 필요 없으므로, 관련 변수 가져오기 및 로그인 확인 로직은 제거합니다.
 
 # --- 상단 메뉴 ---
 with st.container():
@@ -178,36 +181,27 @@ with st.container():
     with col3:
         st.markdown('<div class="menu-icon">⋮</div>', unsafe_allow_html=True) # 더보기 아이콘
 
-# --- 고혈압 등급 차트 및 텍스트 ---
-with st.container():
-    # .circle-chart-container가 이제 카드 역할과 차트 컨테이너 역할을 겸함
-    st.markdown('<div class="circle-chart-container">', unsafe_allow_html=True)
+# --- 고혈압 등급 차트 및 텍스트 컨테이너 ---
+# 이 컨테이너는 차트와 그 아래의 텍스트를 감싸는 역할을 합니다.
+st.markdown('<div style="position: relative; width: 325px; height: 325px; margin: 20px auto;">', unsafe_allow_html=True)
 
-    # 포인터 이미지 로드 (Base64)
-    pointer_base64_data = None
-    pointer_image_path = "pointer.png" # 포인터 이미지 파일 경로
-    if os.path.exists(pointer_image_path):
-        try:
-            with open(pointer_image_path, "rb") as f:
-                pointer_bytes = f.read()
-            pointer_base64_data = base64.b64encode(pointer_bytes).decode("utf-8")
-        except Exception as e:
-            st.warning(f"포인터 이미지 '{pointer_image_path}' 로딩 오류: {e}")
-    else:
-        st.warning(f"포인터 이미지 파일 '{pointer_image_path}'을(를) 찾을 수 없습니다. 주의 등급 포인터가 표시되지 않습니다.")
+# 포인터 이미지 로드 (Base64)
+pointer_base64_data = None
+pointer_image_path = "pointer.png" # 포인터 이미지 파일 경로 (이 파일이 존재해야 합니다)
+if os.path.exists(pointer_image_path):
+    try:
+        with open(pointer_image_path, "rb") as f:
+            pointer_bytes = f.read()
+        pointer_base64_data = base64.b64encode(pointer_bytes).decode("utf-8")
+    except Exception as e:
+        st.warning(f"포인터 이미지 '{pointer_image_path}' 로딩 오류: {e}")
+else:
+    st.warning(f"포인터 이미지 파일 '{pointer_image_path}'을(를) 찾을 수 없습니다. 주의 등급 포인터가 표시되지 않습니다.")
 
-    # 원형 차트 (SVG) - 포인터 Base64 데이터를 전달
-    st.markdown(create_circle_chart_svg("caution", pointer_base64_data), unsafe_allow_html=True)
+# 원형 차트 (SVG) - 포인터 Base64 데이터를 전달
+st.markdown(create_circle_chart_svg("caution", pointer_base64_data), unsafe_allow_html=True)
 
-    # 중앙 텍스트 및 등급 텍스트는 이제 SVG 내부에 있으므로 여기서는 제거
-    # st.markdown('<p class="chart-center-text">고혈압 지수</p>', unsafe_allow_html=True)
-    # st.markdown('<p class="level-text normal">정상</p>', unsafe_allow_html=True)
-    # ...
+# 하단 설명 텍스트 (새로운 위치)
+st.markdown('<p class="bottom-description-text-new">고혈압 지수 주의 등급입니다.</p>', unsafe_allow_html=True)
 
-    st.markdown('</div>', unsafe_allow_html=True) # circle-chart-container 닫기
-
-# --- 하단 설명 텍스트 ---
-st.markdown('<p class="bottom-description-text">고혈압 지수 주의 등급입니다.</p>', unsafe_allow_html=True)
-
-st.markdown("---")
-st.write("이 애플리케이션은 Streamlit 디자인 테스트용입니다.")
+st.markdown('</div>', unsafe_allow_html=True) # 차트 및 텍스트 컨테이너 닫기
