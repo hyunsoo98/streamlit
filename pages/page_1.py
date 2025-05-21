@@ -1,11 +1,3 @@
-The StreamlitSetPageConfigMustBeFirstCommandError occurs because st.set_page_config() was called after other Streamlit commands, specifically after the apply_creatie_css() function. The Streamlit documentation states that set_page_config() must be the very first Streamlit command in your script.
-
-To fix this, you need to move the st.set_page_config() call to the absolute top of your script, right after your imports and before any other Streamlit functions or custom CSS application.
-
-Here's the corrected page_1.py code:
-
-Python
-
 import streamlit as st
 from google.cloud import vision
 import io
@@ -27,7 +19,6 @@ temp_credentials_path = st.session_state.get('temp_credentials_path')
 if vision_client is None:
     st.error("Google Cloud Vision API 클라이언트가 초기화되지 않았습니다. 메인 페이지를 확인하거나 앱을 다시 시작해주세요.")
     st.stop()
-
 
 # --- DB 설정 및 함수 (이미지 처리 결과 저장용) ---
 # 예시: 이미지 처리 결과를 저장할 테이블
@@ -69,12 +60,11 @@ def save_image_result(image_name, extracted_text, parsed_data, prediction_proba,
     finally:
         conn.close()
 
-# 앱 시작 시 DB 초기화 (한 번만 실행되도록)
+# App start DB initialization (run only once)
 if 'image_results_db_initialized' not in st.session_state:
     init_image_results_db()
     st.session_state.image_results_db_initialized = True
 # -----------------------------------------------
-
 
 # --- Creatie.ai CSS 적용 시작 ---
 def apply_creatie_css():
@@ -609,7 +599,3 @@ if temp_credentials_path and os.path.exists(temp_credentials_path):
         # st.write(f"임시 인증 파일 삭제됨: {temp_credentials_path}") # 선택 사항: 디버깅용
     except OSError as e:
         st.warning(f"임시 인증 파일 삭제 중 오류 발생: {e}")
-
-# Removed the redundant horizontal line and text at the very bottom based on the request.
-# st.markdown("---")
-# st.write("이 애플리케이션은 Google Cloud Vision API 및 제공된 데이터 처리 로직을 사용합니다.")
