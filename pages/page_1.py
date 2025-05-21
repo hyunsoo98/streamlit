@@ -1,3 +1,11 @@
+The StreamlitSetPageConfigMustBeFirstCommandError occurs because st.set_page_config() was called after other Streamlit commands, specifically after the apply_creatie_css() function. The Streamlit documentation states that set_page_config() must be the very first Streamlit command in your script.
+
+To fix this, you need to move the st.set_page_config() call to the absolute top of your script, right after your imports and before any other Streamlit functions or custom CSS application.
+
+Here's the corrected page_1.py code:
+
+Python
+
 import streamlit as st
 from google.cloud import vision
 import io
@@ -7,6 +15,9 @@ import re
 import pandas as pd
 import numpy as np
 import sqlite3 # DB 사용을 위해 sqlite3 임포트
+
+# PAGE CONFIG MUST BE THE FIRST STREAMLIT COMMAND
+st.set_page_config(page_title="이미지 건강 데이터 추출 및 분석", layout="centered")
 
 # --- Vision API 클라이언트와 임시 인증 파일 경로를 session_state에서 가져오기 ---
 vision_client = st.session_state.get('vision_client')
@@ -164,25 +175,6 @@ def apply_creatie_css():
 apply_creatie_css()
 # --- Creatie.ai CSS 적용 끝 ---
 
-
-# 페이지 설정
-st.set_page_config(page_title="이미지 건강 데이터 추출 및 분석", layout="centered")
-
-# 기존 st.title 및 st.write 대신 커스텀 CSS 적용을 위한 로고 및 제목 섹션
-st.markdown('<div class="logo-container">', unsafe_allow_html=True)
-st.markdown('<p class="carebite-text">CareBite</p>', unsafe_allow_html=True)
-# group-1에 해당하는 요소가 있다면 여기에 추가 (예: 아이콘 이미지)
-# st.markdown('<div class="group-1-style"></div>', unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
-
-# 나머지 제목 및 설명 (기존의 st.title, st.write는 위에 정의된 h1/p 스타일을 따름)
-st.title("Google Cloud Vision API를 이용한 이미지 건강 데이터 추출 및 분석")
-st.write("건강검진 결과 이미지를 업로드하면 Vision API로 텍스트를 추출하고, 추출된 데이터를 분석하여 고혈압 위험도를 예측합니다.")
-st.write("⚠️ **주의:** 이 앱은 예시 목적으로, 실제 의료 진단에 사용될 수 없습니다. 예측 결과는 참고용입니다.")
-
-# 임시 인증 파일 경로 초기화 (try 블록 외부에서 정의)
-temp_credentials_path = None
-client = None # Vision API 클라이언트 초기화
 
 # Google Cloud 인증 정보 설정
 # Streamlit secrets를 사용하여 안전하게 관리합니다.
@@ -508,6 +500,18 @@ model_features_order = [
 
 # --- Streamlit 앱 메인 로직 ---
 
+# 기존 st.title 및 st.write 대신 커스텀 CSS 적용을 위한 로고 및 제목 섹션
+st.markdown('<div class="logo-container">', unsafe_allow_html=True)
+st.markdown('<p class="carebite-text">CareBite</p>', unsafe_allow_html=True)
+# group-1에 해당하는 요소가 있다면 여기에 추가 (예: 아이콘 이미지)
+# st.markdown('<div class="group-1-style"></div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# 나머지 제목 및 설명 (기존의 st.title, st.write는 위에 정의된 h1/p 스타일을 따름)
+st.title("Google Cloud Vision API를 이용한 이미지 건강 데이터 추출 및 분석")
+st.write("건강검진 결과 이미지를 업로드하면 Vision API로 텍스트를 추출하고, 추출된 데이터를 분석하여 고혈압 위험도를 예측합니다.")
+st.write("⚠️ **주의:** 이 앱은 예시 목적으로, 실제 의료 진단에 사용될 수 없습니다. 예측 결과는 참고용입니다.")
+
 # 이미지 업로드 위젯
 uploaded_file = st.file_uploader("건강검진 결과 이미지를 선택하세요...", type=["jpg", "jpeg", "png", "gif", "bmp"])
 
@@ -605,3 +609,7 @@ if temp_credentials_path and os.path.exists(temp_credentials_path):
         # st.write(f"임시 인증 파일 삭제됨: {temp_credentials_path}") # 선택 사항: 디버깅용
     except OSError as e:
         st.warning(f"임시 인증 파일 삭제 중 오류 발생: {e}")
+
+# Removed the redundant horizontal line and text at the very bottom based on the request.
+# st.markdown("---")
+# st.write("이 애플리케이션은 Google Cloud Vision API 및 제공된 데이터 처리 로직을 사용합니다.")
