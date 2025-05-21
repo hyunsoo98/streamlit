@@ -68,6 +68,12 @@ def apply_custom_css():
         margin-top: 20px; /* 이미지와의 간격 */
     }
 
+    /* 이미지 기본 스타일 */
+    img {
+        overflow-clip-margin: content-box;
+        overflow: clip;
+    }
+    
     /* CareBite- 이미지 스타일 */
     .carebite-image {
         width: 150px; /* 로고 이미지 크기 키움 (조절 가능) */
