@@ -1,8 +1,9 @@
 import streamlit as st
 import base64 # 이미지 Base64 인코딩용
 import os # 파일 경로 확인용
-import numpy as np
-# --- CSS 추가 (이 페이지 전용) ---
+import numpy as np # numpy 임포트
+
+# --- CSS 추가 (이 페이지 전용, app.py의 CSS와 병합됨) ---
 st.markdown("""
 <style>
 /* 이 페이지의 CSS는 app.py의 전역 CSS와 병합됩니다. */
@@ -19,7 +20,6 @@ st.markdown("""
     margin-top: 20px; /* 상단 여백 조절 */
     margin-left: auto;
     margin-right: auto;
-    /* max-width를 설정하여 중앙에 고정된 너비로 보이게 할 수도 있습니다. */
 }
 .menu-icon {
     width: 45px;
@@ -41,21 +41,21 @@ st.markdown("""
     flex-grow: 1; /* 남은 공간을 채워 제목을 중앙으로 밀어냄 */
 }
 
-/* 메인 카드 (사각형) */
-.main-card {
-    width: 325px; /* 원본 디자인과 유사한 너비 */
-    height: 325px; /* 원형 차트가 들어갈 충분한 공간 */
-    box-shadow: 3px 6px 10px 0px rgba(0, 0, 0, 0.1); /* 약한 그림자 */
+/* 메인 카드 (사각형) - 제거됨 */
+/* .main-card {
+    width: 325px;
+    height: 325px;
+    box-shadow: 3px 6px 10px 0px rgba(0, 0, 0, 0.1);
     border-radius: 45px;
     background: #FFFFFF;
-    margin-top: 20px; /* 상단 메뉴와의 간격 */
+    margin-top: 20px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    position: relative; /* 내부 absolute 요소의 기준 */
-    overflow: hidden; /* 넘치는 요소 숨기기 */
-}
+    position: relative;
+    overflow: hidden;
+} */
 
 /* 원형 차트 SVG 컨테이너 */
 .circle-chart-container {
@@ -65,6 +65,10 @@ st.markdown("""
     display: flex;
     justify-content: center;
     align-items: center;
+    /* 사각형이 없어지므로 상단 메뉴와의 간격을 직접 조절 */
+    margin-top: 50px; /* 상단 메뉴와의 간격 조절 */
+    margin-left: auto;
+    margin-right: auto;
 }
 
 /* 원형 차트의 중앙 텍스트 */
@@ -114,7 +118,7 @@ st.markdown("""
     font-size: 16px;
     font-weight: 400;
     text-align: center;
-    margin-top: 20px; /* 카드와의 간격 */
+    margin-top: 20px; /* 차트와의 간격 */
     margin-bottom: 20px; /* 하단 여백 */
 }
 
@@ -134,20 +138,9 @@ def create_circle_chart_svg(value_level="caution"):
     # 차트의 중심 좌표 및 반지름
     cx, cy, r = 125, 125, 100
 
-    # 각 섹션의 시작 각도 (시계방향으로)
-    # 0도 = 3시 방향, 90도 = 6시 방향
-    # 정상 (시작: 135도, 끝: 225도)
-    # 주의 (시작: 45도, 끝: 135도)
-    # 위험 (시작: -45도, 끝: 45도) 또는 (315도, 45도)
-    # 고위험 (시작: 225도, 끝: 315도)
-
-    # SVG Path for arcs (D = "M startX startY A r r 0 large-arc-flag sweep-flag endX endY")
-    # large-arc-flag: 0 for less than 180, 1 for more than 180
-    # sweep-flag: 0 for counter-clockwise, 1 for clockwise
-
     # Helper to get point on circle
     def get_point(angle_deg, radius):
-        angle_rad = (angle_deg - 90) * (3.1415926535 / 180) # 0도 = 12시 방향에서 시작하도록 조정
+        angle_rad = (angle_deg - 90) * (np.pi / 180) # 0도 = 12시 방향에서 시작하도록 조정
         x = cx + radius * np.cos(angle_rad)
         y = cy + radius * np.sin(angle_rad)
         return x, y
@@ -163,9 +156,10 @@ def create_circle_chart_svg(value_level="caution"):
     for section in sections:
         start_x, start_y = get_point(section["start_angle"], r)
         end_x, end_y = get_point(section["end_angle"], r)
-        large_arc_flag = 1 if (section["end_angle"] - section["start_angle"]) % 360 > 180 else 0
-        
-        path_d = f"M {cx},{cy} L {start_x},{start_y} A {r},{r} 0 {large_arc_flag} 1 {end_x},{end_y} Z"
+        large_arc_flag = 1 if abs(section["end_angle"] - section["start_angle"]) % 360 > 180 else 0
+        sweep_flag = 1 if section["start_angle"] < section["end_angle"] else 0 # 시계방향
+
+        path_d = f"M {cx},{cy} L {start_x},{start_y} A {r},{r} 0 {large_arc_flag} {sweep_flag} {end_x},{end_y} Z"
         paths.append(f'<path d="{path_d}" fill="{section["color"]}" />')
     
     # 중앙에 흰색 원을 뚫어서 도넛 형태로 만듭니다.
@@ -190,9 +184,10 @@ with st.container():
     with col3:
         st.markdown('<div class="menu-icon">⋮</div>', unsafe_allow_html=True) # 더보기 아이콘
 
-# --- 메인 카드 및 고혈압 등급 차트 ---
+# --- 고혈압 등급 차트 및 텍스트 (이제 사각형 없이 직접 배치) ---
+# .main-card가 없어졌으므로, .circle-chart-container가 직접 페이지 중앙에 오도록 조정
 with st.container():
-    st.markdown('<div class="main-card">', unsafe_allow_html=True)
+    st.markdown('<div class="circle-chart-container">', unsafe_allow_html=True)
 
     # 원형 차트 (SVG)
     st.markdown(create_circle_chart_svg("caution"), unsafe_allow_html=True) # '주의' 레벨을 기본으로
@@ -224,7 +219,7 @@ with st.container():
     else:
         st.warning(f"포인터 이미지 파일 '{pointer_image_path}'을(를) 찾을 수 없습니다. 주의 등급 포인터가 표시되지 않습니다.")
 
-    st.markdown('</div>', unsafe_allow_html=True) # main-card 닫기
+    st.markdown('</div>', unsafe_allow_html=True) # circle-chart-container 닫기
 
 # --- 하단 설명 텍스트 ---
 st.markdown('<p class="bottom-description-text">고혈압 지수 주의 등급입니다.</p>', unsafe_allow_html=True)
