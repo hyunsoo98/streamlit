@@ -6,8 +6,8 @@ import base64
 # st.set_page_config는 항상 첫 번째 Streamlit 명령이어야 합니다.
 st.set_page_config(
     page_title="통합 건강 분석 앱",
-    layout="centered",
-    initial_sidebar_state="collapsed"
+    layout="centered", # 중앙 정렬을 위해 'centered' 레이아웃 사용
+    initial_sidebar_state="collapsed" # 초기 사이드바는 숨겨둠
 )
 
 # --- CSS 적용 함수 (이전과 동일) ---
@@ -160,7 +160,6 @@ vision_client = None
 
 try:
     # secrets.toml에서 Google Cloud 서비스 계정 정보 로드
-    # (이전 코드에서 가져온 부분 유지)
     google_cloud_settings = st.secrets["google_cloud"]
     google_credentials_json = json.dumps({
         "type": google_cloud_settings["type"],
@@ -221,9 +220,9 @@ else:
 st.markdown('<p class="carebite-text">CareBite</p>', unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
-# --- 로그인 페이지로 이동하는 버튼 ---
-# 이제 'pages/page_1.py' (로그인 페이지)로 이동
-st.page_link("pages/page_1.py", label="시작하기", icon="🚀")
+# --- 이미지 분석 페이지로 이동하는 버튼 ---
+# 이제 'pages/page_1.py' (이미지 분석 페이지)로 직접 이동
+st.page_link("pages/page_1.py", label="이미지 분석 시작하기", icon="🚀")
 
 st.markdown("---")
 st.write("이 애플리케이션은 Google Cloud Vision API 및 제공된 데이터 처리 로직을 사용합니다.")
