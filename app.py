@@ -6,83 +6,87 @@ import json
 import re
 import pandas as pd
 import numpy as np
-import base64 # base64 모듈 임포트
+import base64
 
 # st.set_page_config는 항상 첫 번째 Streamlit 명령이어야 합니다.
 st.set_page_config(
     page_title="이미지 건강 데이터 추출 및 분석",
-    layout="centered", # 중앙 정렬을 위해 'centered' 레이아웃 사용
+    layout="centered",
     initial_sidebar_state="collapsed"
 )
 
 def apply_custom_css():
     st.markdown("""
     <style>
-    /* 1. 전체 앱 배경색 및 폰트 설정 (welcome 클래스 역할) */
+    /* 전체 앱 배경색 및 폰트 설정 */
     .stApp {
-        background-color: #FFFFFF; /* 배경색 흰색 */
+        background-color: #FFFFFF;
         font-family: "Poppins", sans-serif;
         overflow-x: hidden;
-
-        /* body를 flex container로 설정하여 내용물 중앙 정렬 */
         display: flex;
-        flex-direction: column; /* 세로 방향으로 요소들을 쌓음 */
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        padding: 0 !important; /* stApp 자체의 모든 패딩 제거 */
+    }
+
+    /* Streamlit의 주요 내부 컨테이너에 대한 강제 중앙 정렬 및 패딩/마진 제거 */
+    /* 개발자 도구 스크린샷을 기반으로 하여, 로고를 감싸는 상위 div들에 적용 */
+    .main .block-container,
+    .stBlock,
+    .stVerticalBlock,
+    .stMarkdownContainer { /* stMarkdownContainer 추가: 로고 이미지를 직접 감싸는 div */
+        display: flex;
+        flex-direction: column; /* 세로로 쌓되, flexbox 정렬 활용 */
         justify-content: center; /* 수직 중앙 정렬 */
         align-items: center; /* 수평 중앙 정렬 */
-        min-height: 100vh; /* 최소 높이를 뷰포트 높이로 설정 */
-        padding-top: 0; /* stApp 자체의 기본 패딩 제거 */
-        padding-bottom: 0; /* stApp 자체의 기본 패딩 제거 */
+        width: 100% !important; /* 부모 너비에 꽉 채우도록 */
+        padding: 0 !important; /* 내부 패딩 제거 */
+        margin: 0 !important; /* 내부 마진 제거 */
     }
 
-    /* Streamlit의 기본 컴포넌트의 마진/패딩을 초기화하여 더 세밀한 제어 가능 */
-    .stBlock {
-        margin: 0 !important;
-        padding: 0 !important;
+    /* 로고 이미지와 텍스트를 감싸는 커스텀 컨테이너 */
+    /* 이 컨테이너는 이제 Streamlit이 자동 생성하는 div들의 중앙 정렬을 따름 */
+    .logo-elements-wrapper {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        width: 100%; /* 부모에 맞춰 너비 사용 */
+        margin-bottom: 20px; /* 아래 내용과의 간격 */
     }
-    .stBlock > div {
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-
-
-.logo-elements-wrapper {
-    display: flex; /* flex 컨테이너로 설정 */
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    width: fit-content; /* 또는 고정 너비. 내용물만큼 너비를 가짐 */
-    margin-left: auto; /* 이 래퍼 자체를 중앙 정렬 */
-    margin-right: auto;
-    margin-bottom: 20px;
-}
 
     /* CareBite 텍스트 스타일 */
     .carebite-text {
         color: #333333;
         font-family: "Poppins", sans-serif;
-        font-size: 80px; /* 폰트 크기 크게 (2.5배) */
-        line-height: 1; /* 텍스트 줄 간격 조절 */
+        font-size: 80px;
+        line-height: 1;
         font-weight: 600;
-        white-space: nowrap; /* 텍스트가 한 줄로 유지되도록 */
-        text-align: center; /* 텍스트 자체 중앙 정렬 */
+        white-space: nowrap;
+        text-align: center;
         margin-top: 20px; /* 이미지와의 간격 */
     }
 
-    /* 이미지 기본 스타일 */
-    img {
-        overflow-clip-margin: content-box;
-        overflow: clip;
-    }
-    
     /* CareBite- 이미지 스타일 */
     .carebite-image {
         width: 150px; /* 로고 이미지 크기 키움 (조절 가능) */
-        height: auto; /* 비율 유지 */
+        height: auto;
         object-fit: contain;
-        display: block; /* 중앙 정렬을 위해 블록 요소로 */
+        display: block; /* 블록 요소로 설정 */
+        /* margin: auto; 는 부모가 text-align: center; 이거나 flex justify-content: center; 일 때 작동 */
     }
 
-    /* Streamlit 기본 제목/텍스트 스타일 (전체 앱에 적용) */
+    /* Streamlit 내부의 <img> 태그 기본 스타일 오버라이드 (선택 사항) */
+    /* 로고 이미지 자체에 overflow: clip; 이 적용되어 있다면 강제 제거 */
+    img {
+        overflow-clip-margin: content-box; /* 기존 CSS 유지 */
+        overflow: clip; /* 기존 CSS 유지 */
+        /* 만약 이미지가 잘린다면, overflow: visible; !important; 로 변경 시도 */
+    }
+
+    /* Streamlit 기본 제목/텍스트 스타일 */
     h1, h2, h3, h4, h5, h6, p, label, .stText, .stMarkdown {
         color: #333333;
         font-family: "Poppins", sans-serif;
@@ -159,10 +163,10 @@ st.session_state['temp_credentials_path'] = temp_credentials_path
 
 # --- 앱의 초기 로딩 화면 (환영 페이지) ---
 
-# 로고 이미지와 텍스트를 감싸는 래퍼 (이제 상자가 없으므로 페이지 중앙에 바로 배치)
+# 로고 이미지와 텍스트를 감싸는 래퍼
 st.markdown('<div class="logo-elements-wrapper">', unsafe_allow_html=True)
 
-image_path = "carebite-.png" # 이미지 파일 경로 설정
+image_path = "carebite-.png"
 
 if os.path.exists(image_path):
     try:
@@ -170,6 +174,9 @@ if os.path.exists(image_path):
             image_bytes = f.read()
         image_base64 = base64.b64encode(image_bytes).decode("utf-8")
 
+        # st.markdown은 자동으로 <p> 태그나 다른 블록 요소를 생성할 수 있습니다.
+        # <p> 태그가 이미지를 감싸지 않도록 <img> 태그를 직접 삽입.
+        # 이 img 태그를 감싸는 div는 .stMarkdownContainer 클래스를 가지게 됩니다.
         st.markdown(
             f"""
             <img src="data:image/png;base64,{image_base64}" class="carebite-image">
@@ -184,24 +191,16 @@ else:
     st.warning(f"이미지 파일 '{image_path}'을(를) 찾을 수 없습니다.")
 
 # 로고 텍스트
+# 마찬가지로 텍스트를 감싸는 <p> 태그가 .stMarkdownContainer 클래스를 가지게 됩니다.
 st.markdown('<p class="carebite-text">CareBite</p>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True) # logo-elements-wrapper 닫기
 
-# 이제 여기에 다른 앱 내용이 오게 됩니다.
-# 이미지 캡처에는 보이지 않으므로, 이 부분은 제거하거나 다른 페이지로 이동해야 합니다.
-st.markdown("---") # 구분선 유지
-
-# 앱의 메인 기능 시작 (환영 페이지 이후 내용)
+# 나머지 앱 내용
+st.markdown("---")
 st.write("이 애플리케이션은 Google Cloud Vision API 및 제공된 데이터 처리 로직을 사용합니다.")
 
-# (이하 기존 코드 동일)
-# 예시: 다른 위젯 추가 (이 부분도 환영 페이지라면 필요 없을 수 있습니다)
-# st.text_input("이름을 입력하세요:")
-# st.button("제출")
-
-
-# 임시 인증 파일 삭제
+# ... (임시 인증 파일 삭제 로직)
 if temp_credentials_path and os.path.exists(temp_credentials_path):
     try:
         os.remove(temp_credentials_path)
