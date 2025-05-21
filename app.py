@@ -63,7 +63,7 @@ def apply_creatie_css():
        여기서는 시각적 구분을 위해 임시 배경색과 크기만 적용합니다.
        실제 애플리케이션에서는 이 부분을 이미지로 대체하거나 다른 방식으로 구현해야 합니다. */
     .group-1-style {
-        /* position: absolute; top: 299px; left: 158px; */
+        position: absolute; top: 299px; left: 158px;
         width: 48px;
         height: 76px;
         /* background-color: rgba(255, 255, 255, 0.2); */ /* 시각적 확인을 위한 임시 배경 (주석 처리) */
@@ -96,7 +96,7 @@ def apply_creatie_css():
         font-family: "Poppins", sans-serif;
     }
 
-    /* Google Fonts Poppins 임포트 */
+    Google Fonts Poppins 임포트
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
 
     </style>
