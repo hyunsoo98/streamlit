@@ -1,5 +1,8 @@
 import streamlit as st
 
+# --- 1. st.set_page_config()를 맨 위로 이동 ---
+st.set_page_config(layout="wide") # 넓은 레이아웃으로 설정하여 여백 확보
+
 def apply_custom_css():
     st.markdown("""
     <style>
@@ -57,11 +60,8 @@ def apply_custom_css():
     </style>
     """, unsafe_allow_html=True)
 
-# CSS 적용 함수 호출
+# --- 2. CSS 적용 함수 호출 (set_page_config 아래) ---
 apply_custom_css()
-
-# Streamlit 앱 구성
-st.set_page_config(layout="wide") # 넓은 레이아웃으로 설정하여 여백 확보
 
 # 로고 영역 (carebite-text를 포함)
 # 로고 컨테이너에 CSS 클래스를 부여하고, 그 안에 텍스트를 넣습니다.
