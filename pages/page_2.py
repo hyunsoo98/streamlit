@@ -41,10 +41,10 @@ st.markdown("""
     flex-grow: 1; /* 남은 공간을 채워 제목을 중앙으로 밀어냄 */
 }
 
-/* 원형 차트 SVG 컨테이너 */
+/* 원형 차트 SVG 컨테이너 (이제 이 자체가 카드 역할) */
 .circle-chart-container {
-    width: 325px; /* 원본 카드 너비에 맞춤 */
-    height: 325px; /* 원본 카드 높이에 맞춤 */
+    width: 325px; /* 원본 디자인과 유사한 너비 */
+    height: 325px; /* 원본 디자인과 유사한 높이 */
     border-radius: 45px; /* 원본 카드 모서리 둥글게 */
     box-shadow: 3px 6px 10px 0px rgba(0, 0, 0, 0.1); /* 원본 카드 그림자 */
     background: #FFFFFF; /* 원본 카드 배경색 */
@@ -67,23 +67,6 @@ st.markdown("""
     transform: translate(-50%, -50%); /* 정확한 중앙 정렬 */
     z-index: 1;
 }
-
-/* 원형 차트의 중앙 텍스트 */
-.chart-center-text {
-    position: absolute;
-    color: #333333;
-    font-family: "Poppins", sans-serif;
-    font-size: 32px; /* 고혈압 지수 텍스트 크기 */
-    font-weight: 600;
-    text-align: center;
-    z-index: 2; /* SVG 위에 표시되도록 */
-}
-
-/* 각 등급 텍스트 (정상, 주의, 위험, 고위험) - SVG 내부에 직접 삽입 */
-/* .level-text { ... } */
-
-/* 포인터 아이콘 - SVG 내부에 직접 삽입 */
-/* .pointer-icon { ... } */
 
 /* 하단 설명 텍스트 */
 .bottom-description-text {
@@ -108,59 +91,76 @@ def create_circle_chart_svg(value_level="caution", pointer_base64=None):
     # 차트의 중심 좌표 및 반지름
     cx, cy, r = 125, 125, 100 # SVG viewBox가 250x250이므로 중심은 125,125
 
-    # Helper to get point on circle
-    def get_point(angle_deg, radius):
-        # 0도 = 12시 방향에서 시작하도록 조정 (SVG의 0도는 3시 방향)
-        angle_rad = (angle_deg - 90) * (np.pi / 180)
+    # Helper to get point on circle (for arc start/end)
+    def get_arc_point(angle_deg, radius):
+        # SVG의 0도는 3시 방향, 각도는 시계방향으로 증가
+        angle_rad = np.deg2rad(angle_deg)
         x = cx + radius * np.cos(angle_rad)
         y = cy + radius * np.sin(angle_rad)
         return x, y
 
+    # Helper to get text label point (for text positioning)
+    def get_text_point(angle_deg, radius_offset):
+        # 0도 = 3시 방향, 각도는 시계방향으로 증가
+        angle_rad = np.deg2rad(angle_deg)
+        x = cx + (r + radius_offset) * np.cos(angle_rad)
+        y = cy + (r + radius_offset) * np.sin(angle_rad)
+        return x, y
+
+    # 섹션 정의 (시작 각도, 끝 각도 - 시계방향, 3시 방향이 0도)
     sections = [
-        {"color": "#38ADA9", "start_angle": 135, "end_angle": 225, "label": "정상", "text_pos_x": 50, "text_pos_y": 70},  # 정상 (상단 좌)
-        {"color": "#F7D400", "start_angle": 45, "end_angle": 135, "label": "주의", "text_pos_x": 200, "text_pos_y": 70},   # 주의 (상단 우)
-        {"color": "#F79C00", "start_angle": 315, "end_angle": 45, "label": "위험", "text_pos_x": 200, "text_pos_y": 180},   # 위험 (하단 우)
-        {"color": "#FF4D4D", "start_angle": 225, "end_angle": 315, "label": "고위험", "text_pos_x": 50, "text_pos_y": 180}, # 고위험 (하단 좌)
+        {"color": "#F7D400", "start_angle": 0, "end_angle": 90, "label": "주의", "text_angle": 45},     # 주의 (우상단)
+        {"color": "#38ADA9", "start_angle": 90, "end_angle": 180, "label": "정상", "text_angle": 135},   # 정상 (좌상단)
+        {"color": "#FF4D4D", "start_angle": 180, "end_angle": 270, "label": "고위험", "text_angle": 225}, # 고위험 (좌하단)
+        {"color": "#F79C00", "start_angle": 270, "end_angle": 360, "label": "위험", "text_angle": 315},   # 위험 (우하단)
     ]
 
     paths = []
+    texts = []
+    
+    # 각 섹션 그리기
     for section in sections:
-        start_x, start_y = get_point(section["start_angle"], r)
-        end_x, end_y = get_point(section["end_angle"], r)
-        large_arc_flag = 1 if abs(section["end_angle"] - section["start_angle"]) % 360 > 180 else 0
+        start_x, start_y = get_arc_point(section["start_angle"], r)
+        end_x, end_y = get_arc_point(section["end_angle"], r)
+        
+        # 각도가 180도 이상이면 large-arc-flag = 1
+        large_arc_flag = 1 if (section["end_angle"] - section["start_angle"]) > 180 else 0
         sweep_flag = 1 # 시계방향
 
         path_d = f"M {cx},{cy} L {start_x},{start_y} A {r},{r} 0 {large_arc_flag} {sweep_flag} {end_x},{end_y} Z"
         paths.append(f'<path d="{path_d}" fill="{section["color"]}" />')
-    
+        
+        # 등급 텍스트 위치 계산 및 삽입 (원의 바깥쪽)
+        text_offset_r = 20 # 원 반지름 + 텍스트와의 간격
+        text_x, text_y = get_text_point(section["text_angle"], text_offset_r)
+        texts.append(f'<text x="{text_x}" y="{text_y}" text-anchor="middle" fill="#333333" font-family="Poppins, sans-serif" font-size="14px" font-weight="500">{section["label"]}</text>')
+
     # 중앙에 흰색 원을 뚫어서 도넛 형태로 만듭니다.
     paths.append(f'<circle cx="{cx}" cy="{cy}" r="70" fill="#FFFFFF" />') # 중앙 흰색 원
 
-    # 각 등급 텍스트를 SVG 내부에 직접 삽입
-    for section in sections:
-        paths.append(f'<text x="{section["text_pos_x"]}" y="{section["text_pos_y"]}" text-anchor="middle" fill="#333333" font-family="Poppins, sans-serif" font-size="14px" font-weight="500">{section["label"]}</text>')
+    # 중앙 "고혈압 지수" 텍스트
+    texts.append(f'<text x="{cx}" y="{cy + 10}" text-anchor="middle" fill="#333333" font-family="Poppins, sans-serif" font-size="32px" font-weight="600">고혈압 지수</text>')
 
     # 포인터 이미지 (SVG 내부에 <image> 태그로 삽입)
-    # 포인터 위치는 '주의' (caution) 섹션에 고정
+    # 포인터 위치는 '주의' (caution) 섹션의 중간 (45도)에 고정
     if pointer_base64:
-        # SVG 좌표계에 맞게 위치 조정
-        # 원형 차트의 0,0이 SVG의 0,0이므로, 포인터도 그에 맞춰서 위치를 조정
-        # '주의' 섹션은 대략 45도 ~ 135도. 포인터는 90도 방향 (12시 기준 3시)에 위치
-        # 포인터 이미지의 중심이 해당 위치에 오도록 조정
         pointer_width = 30
-        pointer_height = 30 # 이미지 비율에 따라 조절
-        pointer_x = cx + r * np.cos((45 - 90) * (np.pi / 180)) - pointer_width / 2 # 45도 시작점에서 약간 안쪽
-        pointer_y = cy + r * np.sin((45 - 90) * (np.pi / 180)) - pointer_height / 2 # 45도 시작점에서 약간 안쪽
+        pointer_height = 30 
         
-        # 디자인 이미지와 유사하게 '주의' 섹션의 중간 지점 (90도)에 배치
-        # 90도 (12시 기준 3시) 방향으로 포인터를 위치시키고 회전
-        pointer_center_x, pointer_center_y = get_point(90, r + 10) # 반지름보다 조금 더 바깥에 배치
+        # 포인터의 중심이 45도 방향 (주의 섹션 중간)에 위치하도록
+        pointer_pos_x, pointer_pos_y = get_arc_point(45, r + 10) # 원 반지름보다 약간 바깥에
         
-        paths.append(f'<image href="data:image/png;base64,{pointer_base64}" x="{pointer_center_x - pointer_width/2}" y="{pointer_center_y - pointer_height/2}" width="{pointer_width}" height="{pointer_height}" transform="rotate(45 {pointer_center_x} {pointer_center_y})" />') # 45도 회전
+        # 포인터 이미지의 회전 (디자인 이미지에 맞춰 조절)
+        # 45도 방향을 가리키려면 이미지 자체의 방향에 따라 회전 각도 조절 필요
+        # 이미지에 따라 -45, 0, 45, 90 등 다양하게 시도
+        rotation_angle = 45 # 시계방향 45도 회전 (이미지 모양에 따라 다름)
+        
+        paths.append(f'<image href="data:image/png;base64,{pointer_base64}" x="{pointer_pos_x - pointer_width/2}" y="{pointer_pos_y - pointer_height/2}" width="{pointer_width}" height="{pointer_height}" transform="rotate({rotation_angle} {pointer_pos_x} {pointer_pos_y})" />')
     
     svg_content = f"""
     <svg width="250" height="250" viewBox="0 0 250 250" class="chart-svg">
         {chr(10).join(paths)}
+        {chr(10).join(texts)}
     </svg>
     """
     return svg_content
@@ -178,11 +178,9 @@ with st.container():
     with col3:
         st.markdown('<div class="menu-icon">⋮</div>', unsafe_allow_html=True) # 더보기 아이콘
 
-# --- 메인 카드 (이제는 원형 차트 컨테이너) 및 고혈압 등급 차트 ---
+# --- 고혈압 등급 차트 및 텍스트 ---
 with st.container():
-    # .main-card 스타일을 .circle-chart-container에 적용하여 사각형 역할을 겸하게 함
-    # 이 컨테이너 자체가 카드 역할을 하며, 그 안에 SVG 차트가 들어감
-    # CSS에서 .circle-chart-container에 box-shadow, border-radius, background 등을 추가
+    # .circle-chart-container가 이제 카드 역할과 차트 컨테이너 역할을 겸함
     st.markdown('<div class="circle-chart-container">', unsafe_allow_html=True)
 
     # 포인터 이미지 로드 (Base64)
@@ -201,14 +199,10 @@ with st.container():
     # 원형 차트 (SVG) - 포인터 Base64 데이터를 전달
     st.markdown(create_circle_chart_svg("caution", pointer_base64_data), unsafe_allow_html=True)
 
-    # 중앙 텍스트 (SVG 위에 겹쳐지도록)
-    st.markdown('<p class="chart-center-text">고혈압 지수</p>', unsafe_allow_html=True)
-
-    # 등급 텍스트는 이제 SVG 내부에 있으므로 여기서는 제거
+    # 중앙 텍스트 및 등급 텍스트는 이제 SVG 내부에 있으므로 여기서는 제거
+    # st.markdown('<p class="chart-center-text">고혈압 지수</p>', unsafe_allow_html=True)
     # st.markdown('<p class="level-text normal">정상</p>', unsafe_allow_html=True)
-    # st.markdown('<p class="level-text caution">주의</p>', unsafe_allow_html=True)
-    # st.markdown('<p class="level-text warning">위험</p>', unsafe_allow_html=True)
-    # st.markdown('<p class="level-text high-risk">고위험</p>', unsafe_allow_html=True)
+    # ...
 
     st.markdown('</div>', unsafe_allow_html=True) # circle-chart-container 닫기
 
@@ -217,3 +211,4 @@ st.markdown('<p class="bottom-description-text">고혈압 지수 주의 등급�
 
 st.markdown("---")
 st.write("이 애플리케이션은 Streamlit 디자인 테스트용입니다.")
+
