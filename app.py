@@ -232,7 +232,7 @@ st.markdown('</div>', unsafe_allow_html=True) # logo-elements-wrapper 닫기
 # --- 시작하기 버튼 (페이지 이동) ---
 # st.page_link를 사용하여 'page/page_1.py'로 이동하는 버튼 생성
 # 디렉토리 이름과 파일명이 정확히 'page/page_1.py' 여야 합니다.
-st.page_link("page/page_1.py", label="시작하기", icon="🚀")
+st.page_link("pages/page_1.py", label="시작하기", icon="🚀")
 
 
 # 나머지 앱 내용 (환영 페이지 이후에 나타날 부분)
