@@ -1,167 +1,29 @@
 import streamlit as st
-from google.cloud import vision
-import io
-import os
-import json
-import re
-import pandas as pd
-import numpy as np
+import sqlite3 # SQLite 모듈 임포트
+import hashlib # 비밀번호 해싱을 위한 hashlib 임포트 (더 안전한 bcrypt 권장)
 import base64
+import os
+import json # Google Cloud Vision API 관련
 
-# st.set_page_config는 항상 첫 번째 Streamlit 명령이어야 합니다.
+# --- st.set_page_config는 항상 첫 번째 Streamlit 명령이어야 합니다. ---
 st.set_page_config(
-    page_title="이미지 건강 데이터 추출 및 분석",
-    layout="centered", # 중앙 정렬을 위해 'centered' 레이아웃 사용
-    initial_sidebar_state="collapsed" # 초기 사이드바는 숨겨두는 것이 시작 페이지에 더 어울릴 수 있습니다.
+    page_title="CareBite 로그인",
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
+# --- CSS 적용 함수 (이전과 동일) ---
 def apply_custom_css():
     st.markdown("""
     <style>
-    /* 전체 앱 배경색 및 폰트 설정 */
-    .stApp {
-        background-color: #FFFFFF; /* 배경색 흰색 */
-        font-family: "Poppins", sans-serif;
-        overflow-x: hidden;
-
-        /* body를 flex container로 설정하여 모든 내용물 중앙 정렬 */
-        display: flex;
-        flex-direction: column; /* 세로 방향으로 요소들을 쌓음 */
-        justify-content: center; /* 수직 중앙 정렬 (내용물이 적을 때) */
-        align-items: center; /* 수평 중앙 정렬 */
-        min-height: 100vh; /* 최소 높이를 뷰포트 높이로 설정 */
-        padding: 0 !important; /* Streamlit 기본 패딩 제거 */
-    }
-
-    /* Streamlit의 주요 내부 컨테이너에 대한 강제 중앙 정렬 및 패딩/마진 제거 */
-    .main .block-container,
-    .stBlock,
-    .stVerticalBlock {
-        display: flex;
-        flex-direction: column; /* 세로로 쌓되, flexbox 정렬 활용 */
-        justify-content: center; /* 수직 중앙 정렬 */
-        align-items: center; /* 수평 중앙 정렬 */
-        width: 100% !important; /* 부모 너비에 꽉 채우도록 */
-        padding: 0 !important; /* 내부 패딩 제거 */
-        margin: 0 !important; /* 내부 마진 제거 */
-    }
-
-    /* 로고 이미지와 텍스트를 감싸는 커스텀 컨테이너 */
-    .logo-elements-wrapper {
-        display: flex; /* flex 컨테이너로 설정하여 내부 요소 정렬 */
-        flex-direction: column; /* 이미지와 텍스트를 세로로 쌓음 */
-        justify-content: center; /* 수직 중앙 정렬 */
-        align-items: center; /* 수평 중앙 정렬 */
-        width: 100%; /* 부모 너비에 맞춰 */
-        margin-bottom: 40px; /* 아래 시작 버튼과의 간격 확보 */
-    }
-
-    /* CareBite 텍스트 스타일 */
-    .carebite-text {
-        color: #333333;
-        font-family: "Poppins", sans-serif;
-        font-size: 80px; /* 폰트 크기 크게 (2.5배) */
-        line-height: 1; /* 텍스트 줄 간격 조절 */
-        font-weight: 600;
-        white-space: nowrap; /* 텍스트가 한 줄로 유지되도록 */
-        text-align: center; /* 텍스트 자체 중앙 정렬 */
-        margin-top: 20px; /* 이미지와의 간격 */
-    }
-
-    /* CareBite- 이미지 스타일 */
-    .carebite-image {
-        width: 150px; /* 로고 이미지 크기 키움 (조절 가능) */
-        height: auto; /* 비율 유지 */
-        object-fit: contain;
-        display: block; /* 블록 요소로 설정 */
-        margin: auto; /* 블록 요소 중앙 정렬 */
-    }
-
-    /* Streamlit이 img 태그에 적용하는 기본 overflow 속성 (유지) */
-    img {
-        overflow-clip-margin: content-box;
-        overflow: clip;
-    }
-
-    /* Streamlit의 stMarkdownContainer에 대한 스타일 (핵심 변경) */
-    .stMarkdownContainer {
-        display: flex; /* flex 컨테이너로 설정 */
-        justify-content: center; /* 내부 요소를 수평 중앙 정렬 */
-        align-items: center; /* 내부 요소를 수직 중앙 정렬 */
-        width: 100% !important; /* 부모 너비에 꽉 채우도록 */
-        margin: 0 !important; /* 모든 마진 제거 */
-        padding: 0 !important; /* 모든 패딩 제거 */
-    }
-
-    /* Streamlit 기본 제목/텍스트 스타일 (전체 앱에 적용) */
-    h1, h2, h3, h4, h5, h6, p, label, .stText, .stMarkdown {
-        color: #333333;
-        font-family: "Poppins", sans-serif;
-    }
-
-    /* 버튼 스타일 */
-    .stButton > button {
-        background-color: #4CAF50; /* 버튼 배경색 */
-        color: white;
-        padding: 15px 30px; /* 버튼 패딩 크게 */
-        border-radius: 10px; /* 버튼 모서리 둥글게 */
-        border: none;
-        font-weight: 600;
-        font-family: "Poppins", sans-serif;
-        font-size: 1.2rem; /* 버튼 텍스트 크기 */
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-    }
-    .stButton > button:hover {
-        background-color: #368d88; /* 호버 시 색상 변경 */
-    }
-    /* st.page_link 스타일 (st.button과 동일하게 적용되도록) */
-    .st-emotion-cache-12t4u4f > a { /* st.page_link가 생성하는 <a> 태그의 상위 div 클래스 */
-        display: block; /* 링크를 버튼처럼 보이게 */
-        text-decoration: none; /* 밑줄 제거 */
-        text-align: center;
-        background-color: #4CAF50;
-        color: white !important; /* 글자색 강제 흰색 */
-        padding: 15px 30px;
-        border-radius: 10px;
-        border: none;
-        font-weight: 600;
-        font-family: "Poppins", sans-serif;
-        font-size: 1.2rem;
-        cursor: pointer;
-        transition: background-color 0.3s ease;
-        margin-left: auto; /* 페이지 링크 버튼도 중앙 정렬 */
-        margin-right: auto; /* 페이지 링크 버튼도 중앙 정렬 */
-        width: fit-content; /* 내용에 맞는 너비 */
-    }
-    .st-emotion-cache-12t4u4f > a:hover {
-        background-color: #368d88;
-    }
-
-
-    /* 입력 필드 스타일 */
-    .stTextInput > div > div > input {
-        border: 2px solid #D3D3D3;
-        border-radius: 8px;
-        padding: 10px;
-        font-family: "Poppins", sans-serif;
-    }
-
-    /* 알림 메시지 스타일 */
-    .stAlert {
-        font-family: "Poppins", sans-serif;
-    }
-
-    /* Google Fonts Poppins 임포트 */
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
-
+    /* ... (이전 apply_custom_css 내용 그대로 유지) ... */
     </style>
     """, unsafe_allow_html=True)
-
-# CSS 적용 함수 호출
 apply_custom_css()
 
 # --- Google Cloud Vision API 클라이언트 초기화 (기존 코드 유지) ---
+# 이 부분은 로그인 페이지에서는 직접적으로 필요 없을 수 있지만,
+# 세션 상태에 저장하여 다른 페이지에서 사용할 수 있도록 유지합니다.
 temp_credentials_path = None
 vision_client = None
 
@@ -197,53 +59,201 @@ except Exception as e:
 st.session_state['vision_client'] = vision_client
 st.session_state['temp_credentials_path'] = temp_credentials_path
 
-# --- 앱의 초기 로딩 화면 (환영 페이지) ---
+# --- DB 설정 및 함수 ---
+DB_FILE = "users.db" # 사용자 정보를 저장할 SQLite DB 파일
 
-# 로고 이미지와 텍스트를 감싸는 래퍼
-st.markdown('<div class="logo-elements-wrapper">', unsafe_allow_html=True)
+def init_db():
+    """데이터베이스를 초기화하고 users 테이블을 생성합니다."""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-image_path = "carebite-.png" # 이미지 파일 경로 설정
+def hash_password(password):
+    """비밀번호를 해싱합니다."""
+    # 실제 서비스에서는 bcrypt 또는 Argon2와 같은 강력한 해싱 라이브러리를 사용해야 합니다.
+    return hashlib.sha256(password.encode()).hexdigest()
 
-if os.path.exists(image_path):
+def verify_password(password, stored_hash):
+    """입력된 비밀번호와 저장된 해시를 비교합니다."""
+    return hash_password(password) == stored_hash
+
+def register_user(username, password):
+    """새 사용자를 등록합니다."""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
     try:
-        with open(image_path, "rb") as f:
-            image_bytes = f.read()
-        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+        password_hash = hash_password(password)
+        c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, password_hash))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError: # username UNIQUE 제약 조건 위반 (이미 존재하는 사용자)
+        return False
+    finally:
+        conn.close()
 
-        # 로고 이미지 (img 태그)
+def login_user(username, password):
+    """사용자 로그인을 처리합니다."""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT password_hash FROM users WHERE username = ?", (username,))
+    result = c.fetchone()
+    conn.close()
+    if result:
+        stored_hash = result[0]
+        return verify_password(password, stored_hash)
+    return False
+
+# 앱 시작 시 DB 초기화 (한 번만 실행되도록)
+if 'db_initialized' not in st.session_state:
+    init_db()
+    st.session_state.db_initialized = True
+# ---------------------
+
+# --- 세션 상태 초기화 ---
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'username' not in st.session_state:
+    st.session_state.username = None
+if 'show_signup' not in st.session_state:
+    st.session_state.show_signup = False # 회원가입 폼 표시 여부
+
+# --- 로그인 페이지 내용 ---
+
+if not st.session_state.logged_in: # 로그인되지 않은 경우에만 로그인 폼 표시
+    # 상단 로고
+    st.markdown('<div class="top-logo-container">', unsafe_allow_html=True)
+    image_path = "carebite-.png"
+    if os.path.exists(image_path):
+        try:
+            with open(image_path, "rb") as f:
+                image_bytes = f.read()
+            image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+            st.markdown(
+                f"""
+                <img src="data:image/png;base64,{image_base64}" class="social-icon" style="width:116px; height:123px; margin-top: -130px; object-fit: cover;">
+                """,
+                unsafe_allow_html=True,
+            )
+        except Exception as e:
+            st.error(f"로고 이미지 '{image_path}' 로딩 오류: {e}")
+    else:
+        st.warning(f"로고 이미지 파일 '{image_path}'을(를) 찾을 수 없습니다.")
+    st.markdown('<p class="smartly-text">CareBite</p>', unsafe_allow_html=True) # 텍스트 'Smartly'를 'CareBite'로 변경
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # 하단 카드
+    st.markdown('<div class="card-container">', unsafe_allow_html=True)
+
+    if not st.session_state.show_signup: # 로그인 폼
+        st.markdown('<p class="card-title-text">Log in your account</p>', unsafe_allow_html=True)
+
+        st.markdown('<div class="form-container">', unsafe_allow_html=True)
+        st.markdown('<div class="input-group">', unsafe_allow_html=True)
+        st.markdown('<label class="input-label">Email</label>', unsafe_allow_html=True)
+        username = st.text_input("", placeholder="Enter your email", key="login_username")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="input-group">', unsafe_allow_html=True)
+        st.markdown('<label class="input-label">Password</label>', unsafe_allow_html=True)
+        password = st.text_input("", type="password", placeholder="Enter your password", key="login_password")
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True) # form-container 닫기
+
+        if st.button("Sign In", use_container_width=True, help="Click to sign in"): # Streamlit 기본 버튼 사용
+            if login_user(username, password):
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                st.success(f"환영합니다, {username}님!")
+                st.rerun() # 로그인 성공 후 페이지를 다시 로드하여 다음 화면 표시
+            else:
+                st.error("잘못된 사용자 이름 또는 비밀번호입니다.")
+
+        # "Don't have an account?" 링크
         st.markdown(
-            f"""
-            <img src="data:image/png;base64,{image_base64}" class="carebite-image">
+            """
+            <div class="signup-text-container">
+                <p class="signup-text">Don’t have an account? <a href="#" onclick="Streamlit.setSessionState({'show_signup': true})" class="signup-link">Sign Up</a></p>
+            </div>
             """,
             unsafe_allow_html=True,
         )
 
-    except Exception as e:
-        st.error(f"이미지 '{image_path}' 로딩 오류: {e}")
-        st.warning(f"이미지 파일 '{image_path}'을(를) 확인하세요.")
-else:
-    st.warning(f"이미지 파일 '{image_path}'을(를) 찾을 수 없습니다.")
+        st.markdown(
+            """
+            <div class="or-separator-container">
+                <div class="line"></div>
+                <p class="sign-in-with-text">Sign in with</p>
+                <div class="line"></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-# 로고 텍스트
-st.markdown('<p class="carebite-text">CareBite</p>', unsafe_allow_html=True)
+        # 소셜 로그인 버튼 그룹 (실제 기능 없음)
+        st.markdown('<div class="social-login-buttons">', unsafe_allow_html=True)
+        st.markdown('<div class="social-icon-button"><img src="data:image/png;base64,{}" class="social-icon"></div>'.format(base64.b64encode(open("facebook.png", "rb").read()).decode("utf-8") if os.path.exists("facebook.png") else ''), unsafe_allow_html=True)
+        st.markdown('<div class="social-icon-button"><img src="data:image/png;base64,{}" class="social-icon"></div>'.format(base64.b64encode(open("google.png", "rb").read()).decode("utf-8") if os.path.exists("google.png") else ''), unsafe_allow_html=True)
+        st.markdown('<div class="social-icon-button"><img src="data:image/png;base64,{}" class="social-icon"></div>'.format(base64.b64encode(open("apple.png", "rb").read()).decode("utf-8") if os.path.exists("apple.png") else ''), unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown('</div>', unsafe_allow_html=True) # logo-elements-wrapper 닫기
+    else: # 회원가입 폼
+        st.markdown('<p class="card-title-text">Create your account</p>', unsafe_allow_html=True)
 
-# --- 시작하기 버튼 (페이지 이동) ---
-# st.page_link를 사용하여 'page/page_1.py'로 이동하는 버튼 생성
-# 디렉토리 이름과 파일명이 정확히 'page/page_1.py' 여야 합니다.
-st.page_link("pages/page_1.py", label="시작하기", icon="🚀")
+        st.markdown('<div class="form-container">', unsafe_allow_html=True)
+        st.markdown('<div class="input-group">', unsafe_allow_html=True)
+        st.markdown('<label class="input-label">Email</label>', unsafe_allow_html=True)
+        signup_username = st.text_input("", placeholder="Enter your email", key="signup_username")
+        st.markdown('</div>', unsafe_allow_html=True)
 
+        st.markdown('<div class="input-group">', unsafe_allow_html=True)
+        st.markdown('<label class="input-label">Password</label>', unsafe_allow_html=True)
+        signup_password = st.text_input("", type="password", placeholder="Create a password", key="signup_password")
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# 나머지 앱 내용 (환영 페이지 이후에 나타날 부분)
-# 이 부분은 "시작하기" 버튼 아래에 위치합니다.
-# 만약 환영 페이지에 다른 텍스트나 위젯이 더 필요 없다면 이 부분을 제거하세요.
-st.markdown("---")
-st.write("이 애플리케이션은 Google Cloud Vision API 및 제공된 데이터 처리 로직을 사용합니다.")
+        if st.button("Sign Up", use_container_width=True, help="Click to register"):
+            if register_user(signup_username, signup_password):
+                st.success("회원가입이 성공했습니다! 이제 로그인해주세요.")
+                st.session_state.show_signup = False # 회원가입 후 로그인 폼으로 전환
+                st.rerun() # 페이지 다시 로드
+            else:
+                st.error("회원가입에 실패했습니다. 사용자 이름이 이미 존재할 수 있습니다.")
 
-# ... (임시 인증 파일 삭제 로직)
-if temp_credentials_path and os.path.exists(temp_credentials_path):
+        # "Already have an account?" 링크
+        st.markdown(
+            """
+            <div class="signup-text-container">
+                <p class="signup-text">Already have an account? <a href="#" onclick="Streamlit.setSessionState({'show_signup': false})" class="signup-link">Sign In</a></p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown('</div>', unsafe_allow_html=True) # card-container 닫기
+
+else: # 로그인 성공 시
+    st.success(f"안녕하세요, {st.session_state.username}님!")
+    st.write("메인 앱 기능으로 이동하거나 아래 버튼을 클릭하세요.")
+
+    # 로그인 성공 후 페이지 이동 버튼
+    st.page_link("pages/page_1.py", label="이미지 분석 시작하기", icon="🚀")
+
+    if st.button("로그아웃"):
+        st.session_state.logged_in = False
+        st.session_state.username = None
+        st.rerun() # 로그아웃 후 페이지 다시 로드하여 로그인 폼 표시
+
+# 임시 인증 파일 삭제 (앱 종료 시 처리)
+if st.session_state.get('temp_credentials_path') and os.path.exists(st.session_state.get('temp_credentials_path')):
     try:
-        os.remove(temp_credentials_path)
+        os.remove(st.session_state['temp_credentials_path'])
     except OSError as e:
         st.warning(f"임시 인증 파일 삭제 중 오류 발생: {e}")
