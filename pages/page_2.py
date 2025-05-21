@@ -1,7 +1,7 @@
 import streamlit as st
 import base64 # 이미지 Base64 인코딩용
 import os # 파일 경로 확인용
-
+import numpy as np
 # --- CSS 추가 (이 페이지 전용) ---
 st.markdown("""
 <style>
