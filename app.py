@@ -6,12 +6,12 @@ import json
 import re
 import pandas as pd
 import numpy as np
-import base64
+import base64 # base64 모듈 임포트
 
 # st.set_page_config는 항상 첫 번째 Streamlit 명령이어야 합니다.
 st.set_page_config(
     page_title="이미지 건강 데이터 추출 및 분석",
-    layout="centered", # 전체 앱 중앙 정렬을 위해 "wide" 대신 "centered" 또는 필요한 경우 "full" 사용
+    layout="centered", # 중앙 정렬을 위해 'centered' 레이아웃 사용
     initial_sidebar_state="collapsed"
 )
 
@@ -20,17 +20,18 @@ def apply_custom_css():
     <style>
     /* 1. 전체 앱 배경색 및 폰트 설정 (welcome 클래스 역할) */
     .stApp {
-        background-color: #FFFFFF;
+        background-color: #FFFFFF; /* 배경색 흰색 */
         font-family: "Poppins", sans-serif;
         overflow-x: hidden;
 
         /* body를 flex container로 설정하여 내용물 중앙 정렬 */
         display: flex;
         flex-direction: column; /* 세로 방향으로 요소들을 쌓음 */
-        justify-content: center; /* 수직 중앙 정렬 (내용물이 적을 때) */
+        justify-content: center; /* 수직 중앙 정렬 */
         align-items: center; /* 수평 중앙 정렬 */
         min-height: 100vh; /* 최소 높이를 뷰포트 높이로 설정 */
-        padding-top: 0; /* stApp 자체의 기본 패딩 제거 또는 조절 */
+        padding-top: 0; /* stApp 자체의 기본 패딩 제거 */
+        padding-bottom: 0; /* stApp 자체의 기본 패딩 제거 */
     }
 
     /* Streamlit의 기본 컴포넌트의 마진/패딩을 초기화하여 더 세밀한 제어 가능 */
@@ -44,61 +45,36 @@ def apply_custom_css():
     }
 
 
-    /* 2. 사각형 컨테이너 스타일 (rectangle-117 클래스 역할) */
-    .rectangle-container {
-        width: 216px;
-        height: 207px;
-        box-shadow: 5px 10px 10px 0px rgba(0, 0, 0, 0.3);
-        border-radius: 45px;
-        background: #FFFFFF;
-        border: 3px solid #000000;
-        display: flex; /* 내부 요소를 가운데 정렬 */
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        /* absolute position 대신 flexbox와 margin-top 등으로 조절 */
-        /* margin-top: 283px; */ /* .stApp이 flex-container이므로 이 마진은 제거 */
-        z-index: 1; /* 로고 이미지보다 아래에 있도록 */
-    }
-
-    /* 3. 로고 영역 스타일 (logo 클래스 역할) */
-    /* CareBite 텍스트와 이미지 모두를 감싸는 컨테이너 */
+    /* 로고 이미지와 텍스트를 감싸는 컨테이너 */
     .logo-elements-wrapper {
         display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        /* 사각형 상자 위에 겹쳐지도록 음수 마진 사용 및 z-index */
-        margin-top: -150px; /* 사각형 상자 위로 올리는 값 (조절 필요) */
-        z-index: 2; /* 사각형 상자 위에 오도록 */
-        position: relative; /* z-index가 작동하도록 */
+        flex-direction: column; /* 이미지와 텍스트를 세로로 쌓음 */
+        justify-content: center; /* 수직 중앙 정렬 */
+        align-items: center; /* 수평 중앙 정렬 */
+        margin-bottom: 20px; /* 아래 내용과의 간격 */
     }
 
-    /* 4. CareBite 텍스트 스타일 (carebite 클래스 역할) */
+    /* CareBite 텍스트 스타일 */
     .carebite-text {
         color: #333333;
         font-family: "Poppins", sans-serif;
-        font-size: 80px; /* 32px * 2.5 = 80px */
-        line-height: 1;
+        font-size: 80px; /* 폰트 크기 크게 (2.5배) */
+        line-height: 1; /* 텍스트 줄 간격 조절 */
         font-weight: 600;
-        white-space: nowrap;
-        flex-shrink: 0;
-        text-align: center;
-        /* 로고 이미지와의 간격 조절 */
-        margin-top: 10px; /* 이미지 아래 텍스트 간격 */
+        white-space: nowrap; /* 텍스트가 한 줄로 유지되도록 */
+        text-align: center; /* 텍스트 자체 중앙 정렬 */
+        margin-top: 20px; /* 이미지와의 간격 */
     }
 
-    /* 5. CareBite- 이미지 스타일 (carebite- 클래스 역할) */
+    /* CareBite- 이미지 스타일 */
     .carebite-image {
-        width: 80px; /* 로고 크기 조절 */
-        height: auto;
+        width: 150px; /* 로고 이미지 크기 키움 (조절 가능) */
+        height: auto; /* 비율 유지 */
         object-fit: contain;
-        display: block;
-        /* 텍스트와 이미지 사이의 간격 조절 */
-        margin-bottom: 10px;
+        display: block; /* 중앙 정렬을 위해 블록 요소로 */
     }
 
-    /* Streamlit 기본 제목/텍스트 스타일 */
+    /* Streamlit 기본 제목/텍스트 스타일 (전체 앱에 적용) */
     h1, h2, h3, h4, h5, h6, p, label, .stText, .stMarkdown {
         color: #333333;
         font-family: "Poppins", sans-serif;
@@ -137,7 +113,7 @@ def apply_custom_css():
 # CSS 적용 함수 호출
 apply_custom_css()
 
-# --- Google Cloud Vision API 클라이언트 초기화 ---
+# --- Google Cloud Vision API 클라이언트 초기화 (기존 코드 유지) ---
 temp_credentials_path = None
 vision_client = None
 
@@ -175,7 +151,7 @@ st.session_state['temp_credentials_path'] = temp_credentials_path
 
 # --- 앱의 초기 로딩 화면 (환영 페이지) ---
 
-# 로고 이미지와 텍스트를 감싸는 래퍼 (사각형 상자 위에 오도록)
+# 로고 이미지와 텍스트를 감싸는 래퍼 (이제 상자가 없으므로 페이지 중앙에 바로 배치)
 st.markdown('<div class="logo-elements-wrapper">', unsafe_allow_html=True)
 
 image_path = "carebite-.png" # 이미지 파일 경로 설정
@@ -199,25 +175,17 @@ if os.path.exists(image_path):
 else:
     st.warning(f"이미지 파일 '{image_path}'을(를) 찾을 수 없습니다.")
 
-# 로고 텍스트 (상자 위에 배치되는 이미지 바로 아래)
+# 로고 텍스트
 st.markdown('<p class="carebite-text">CareBite</p>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True) # logo-elements-wrapper 닫기
 
-# 사각형 상자 (로고 요소 뒤에 오도록)
-st.markdown('<div class="rectangle-container">', unsafe_allow_html=True)
-# 사각형 상자 안에 다른 내용이 있다면 여기에 추가 (현재는 비어있음)
-st.markdown('</div>', unsafe_allow_html=True)
-
-
 # 이제 여기에 다른 앱 내용이 오게 됩니다.
 # 이미지 캡처에는 보이지 않으므로, 이 부분은 제거하거나 다른 페이지로 이동해야 합니다.
-# st.write("") # 간격 추가
 st.markdown("---") # 구분선 유지
 
 # 앱의 메인 기능 시작 (환영 페이지 이후 내용)
-# st.header("앱 내용 시작") # 환영 페이지에서는 이 제목은 없앨 수 있음
-st.write("이 애플리케이션은 Google Cloud Vision API 및 제공된 데이터 처리 로직을 사용합니다.") # 남은 텍스트 유지
+st.write("이 애플리케이션은 Google Cloud Vision API 및 제공된 데이터 처리 로직을 사용합니다.")
 
 # (이하 기존 코드 동일)
 # 예시: 다른 위젯 추가 (이 부분도 환영 페이지라면 필요 없을 수 있습니다)
@@ -225,7 +193,7 @@ st.write("이 애플리케이션은 Google Cloud Vision API 및 제공된 데이
 # st.button("제출")
 
 
-# 임시 인증 파일 삭제 (필요에 따라 유지하거나 다른 방식으로 관리할 수 있습니다)
+# 임시 인증 파일 삭제
 if temp_credentials_path and os.path.exists(temp_credentials_path):
     try:
         os.remove(temp_credentials_path)
