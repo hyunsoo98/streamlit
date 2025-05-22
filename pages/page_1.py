@@ -60,14 +60,12 @@ def parse_health_data_from_ocr(text):
         data['성별'] = None
     # ---------------------------
 
-    # 키 및 몸무게 파싱 (이미지에 '155(cm)/70(kg)' 패턴이 명확하므로 이에 맞춤)
-    # 이미지 원본을 보면 키/몸무게 값이 '155(cm)/70(kg)' 형태이므로 이 패턴을 찾습니다.
+    # 키 및 몸무게 파싱
     height_weight_match = re.search(r'(\d+)\(cm\)/(\d+)\(kg\)', text)
     if height_weight_match:
         data['신장'] = int(height_weight_match.group(1))
         data['체중'] = int(height_weight_match.group(2))
     else:
-        # '키(cm)/몸무게(kg)' 문구가 있는 경우를 대비한 추가 패턴
         height_weight_match_with_label = re.search(r'키\(cm\)/몸무게\(kg\).*?(\d+)\(cm\)/(\d+)\(kg\)', text, re.DOTALL)
         if height_weight_match_with_label:
              data['신장'] = int(height_weight_match_with_label.group(1))
@@ -76,13 +74,12 @@ def parse_health_data_from_ocr(text):
             data['신장'] = None
             data['체중'] = None
 
-    # 혈압 파싱 (이미지에 '139 / 89 mmHg' 패턴이 명확하므로 이에 맞춤)
+    # 혈압 파싱
     bp_match = re.search(r'(\d+)\s*/\s*(\d+)\s*mmHg', text)
     if bp_match:
         data['수축기 혈압'] = int(bp_match.group(1))
         data['이완기 혈압'] = int(bp_match.group(2))
     else:
-        # '고혈압' 키워드와 함께 패턴을 찾는 경우
         bp_match_with_label = re.search(r'고혈압.*?(\d+)\s*/\s*(\d+)\s*mmHg', text, re.DOTALL)
         if bp_match_with_label:
             data['수축기 혈압'] = int(bp_match_with_label.group(1))
@@ -100,9 +97,14 @@ def parse_health_data_from_ocr(text):
         '트리글리세라이드': r'중성지방\(mg/dL\)\s*(\d+(\.\d+)?)',
         'LDL 콜레스테롤': r'저밀도 콜레스테롤\(mg/dL\)\s*(\d+(\.\d+)?)',
         '혈청 크레아티닌': r'혈청 크레아티닌\(mg/dL\)\s*(\d+(\.\d+)?)',
-        'AST': r'AST\(SGOT\)\(IU/L\)\s*(\d+(\.\d+)?)',
-        'ALT': r'ALT\(SGPT\)\(IU/L\)\s*(\d+(\.\d+)?)',
-        '감마지티피': r'감마지티피\(XGTP\)\(IU/L\)\s*(\d+(\.\d+)?)',
+        # --- AST 및 감마지티피 파싱 개선 ---
+        # AST: 'AST' 또는 'SGOT' 키워드를 포함하여 값을 찾습니다. (유연성 증가)
+        'AST': r'(?:AST|SGOT).*?(\d+(\.\d+)?)',
+        # ALT: 'ALT' 또는 'SGPT' 키워드를 포함하여 값을 찾습니다. (유연성 증가)
+        'ALT': r'(?:ALT|SGPT).*?(\d+(\.\d+)?)',
+        # 감마지티피: '감마지티피' 또는 'XGTP' 키워드를 포함하여 값을 찾습니다. (유연성 증가)
+        '감마지티피': r'(?:감마지티피|XGTP).*?(\d+(\.\d+)?)',
+        # -----------------------------------
         '요단백': r'요단백\s*([가-힣]+)', # '정상', '경계', '단백뇨 의심' 등
         '흡연 상태': None,
         '음주 여부': None
@@ -113,17 +115,21 @@ def parse_health_data_from_ocr(text):
             data[key] = None
             continue
 
+        # re.DOTALL은 줄바꿈도 .에 포함. re.IGNORECASE는 대소문자 무시.
         match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
         if match:
-            value_str = match.group(1)
+            value_str = match.group(1) # 첫 번째 캡처 그룹이 실제 값
             try:
                 data[key] = float(value_str)
             except ValueError:
-                data[key] = value_str.strip()
+                data[key] = value_str.strip() # 숫자가 아니면 문자열 그대로 (예: 요단백)
             except IndexError:
+                # 이 경우는 패턴은 매칭되는데 캡처 그룹이 없을 때 발생.
+                # 현재 패턴들에서는 group(1)이 항상 존재해야 하므로 드물게 발생.
                 data[key] = None
         else:
-            data[key] = None
+            data[key] = None # 패턴을 찾지 못한 경우 None
+
     return data
 
 # --- 피처 엔지니어링 및 전처리 함수 ---
@@ -192,7 +198,6 @@ def preprocess_and_engineer_features(raw_data):
         processed_data['ldl_hdl_ratio'] = np.nan
 
     # `04_modeling.ipynb`의 `df.columns`에서 확인된 피처 리스트 (타겟 제외)
-    # 이 리스트는 모델 학습에 사용된 최종 피처 순서와 동일해야 함
     required_features_from_notebook = [
         '성별코드', '연령대코드(5세단위)', '시력(평균)', '식전혈당(공복혈당)', '총콜레스테롤', '혈색소', '요단백',
         '혈청크레아티닌', '감마지티피', '흡연상태', '음주여부', 'bmi', 'alt_ast_ratio',
