@@ -47,3 +47,4 @@ numpy
 bcrypt
 joblib
 scikit-learn
+pyarrow
