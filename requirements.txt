@@ -48,3 +48,4 @@ bcrypt
 joblib
 scikit-learn
 pyarrow
+imblearn
