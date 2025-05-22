@@ -21,53 +21,79 @@ if vision_client is None:
     st.error("Google Cloud Vision API 클라이언트가 초기화되지 않았습니다. 메인 페이지를 확인하거나 앱을 다시 시작해주세요.")
     st.stop()
 
-# --- DB 설정 및 함수 (이미지 처리 결과 저장용) - 제거됨 ---
-# 이 부분은 이 요청에서 필요하지 않으므로 제거합니다.
-# DB_FILE_IMAGE_RESULTS = "image_results.db"
-# def init_image_results_db(): ...
-# def save_image_result(...): ...
-# if 'image_results_db_initialized' not in st.session_state: ...
-
-# --- Creatie.ai CSS 적용 시작 - 제거됨 ---
-# app.py에서 전역적으로 CSS를 적용하므로 여기서는 제거합니다.
-# def apply_creatie_css(): ...
-# apply_creatie_css()
-
-# Google Cloud 인증 정보 설정 (이미 app.py에서 처리되었으므로 여기서는 제거)
-# try: ... except Exception as e: ...
-# client = get_vision_client() (-> vision_client로 변경되었고, app.py에서 가져옴)
-
 # --- 텍스트 파싱 함수 ---
 def parse_health_data_from_ocr(text):
     data = {}
 
-    # 나이 및 성별 파싱
-    age_gender_match = re.search(r'나이성별\s*(\d+)\s*(여성|남성)', text)
-    if age_gender_match:
-        data['나이'] = int(age_gender_match.group(1))
-        data['성별'] = age_gender_match.group(2).strip()
+    # --- 나이 파싱 개선 ---
+    # 패턴 1: '나이' 키워드 뒤에 바로 숫자 (공백 또는 줄바꿈 포함)
+    age_match_1 = re.search(r'나이\s*(\d+)', text, re.DOTALL)
+    # 패턴 2: '나이' 키워드와 숫자 사이에 줄바꿈이 있는 경우
+    age_match_2 = re.search(r'나이\s*\n\s*(\d+)', text, re.DOTALL)
+    # 패턴 3: OCR이 표를 완전히 분리하여 숫자만 남긴 경우 (흔치 않지만 대비)
+    # 예: OCR 결과에 '45'만 따로 큰 글씨로 인식될 가능성
+    # 이 패턴은 다른 숫자를 오인식할 위험이 있으므로, 특정 영역에서만 적용하거나 신중해야 함
+    # age_match_3 = re.search(r'\b(\d{1,3})\b', text) # 단독으로 숫자만 있을 때
+
+    if age_match_1:
+        data['나이'] = int(age_match_1.group(1))
+    elif age_match_2:
+        data['나이'] = int(age_match_2.group(1))
     else:
         data['나이'] = None
-        data['성별'] = None
 
-    # 키 및 몸무게 파싱 (괄호 이스케이프 수정)
-    height_weight_match = re.search(r'키\(cm\)/몸무게\(kg\)\s*(\d+)\(cm\)/(\d+)\(kg\)', text)
+    # --- 성별 파싱 개선 ---
+    # 패턴 1: '성별' 키워드 뒤에 '여성' 또는 '남성' (공백 또는 줄바꿈 포함)
+    gender_match_1 = re.search(r'성별\s*(여성|남성)', text, re.DOTALL)
+    # 패턴 2: '성별' 키워드와 값 사이에 줄바꿈이 있는 경우
+    gender_match_2 = re.search(r'성별\s*\n\s*(여성|남성)', text, re.DOTALL)
+
+    if gender_match_1:
+        data['성별'] = gender_match_1.group(1).strip()
+    elif gender_match_2:
+        data['성별'] = gender_match_2.group(1).strip()
+    else:
+        # OCR이 '여성' 또는 '남성'만 단독으로 인식할 가능성
+        # 예를 들어, OCR 텍스트에 '여성' 이나 '남성' 이라는 단어가 단독으로 나타날 때
+        isolated_gender_match = re.search(r'\b(여성|남성)\b', text)
+        if isolated_gender_match:
+            data['성별'] = isolated_gender_match.group(1).strip()
+        else:
+            data['성별'] = None
+    # ---------------------------
+
+    # 키 및 몸무게 파싱 (이미지에 '155(cm)/70(kg)' 패턴이 명확하므로 이에 맞춤)
+    # 이미지 원본을 보면 키/몸무게 값이 '155(cm)/70(kg)' 형태이므로 이 패턴을 찾습니다.
+    height_weight_match = re.search(r'(\d+)\(cm\)/(\d+)\(kg\)', text)
     if height_weight_match:
         data['신장'] = int(height_weight_match.group(1))
         data['체중'] = int(height_weight_match.group(2))
     else:
-        data['신장'] = None
-        data['체중'] = None
+        # '키(cm)/몸무게(kg)' 문구가 있는 경우를 대비한 추가 패턴
+        height_weight_match_with_label = re.search(r'키\(cm\)/몸무게\(kg\).*?(\d+)\(cm\)/(\d+)\(kg\)', text, re.DOTALL)
+        if height_weight_match_with_label:
+             data['신장'] = int(height_weight_match_with_label.group(1))
+             data['체중'] = int(height_weight_match_with_label.group(2))
+        else:
+            data['신장'] = None
+            data['체중'] = None
 
-    # 혈압 파싱 (고혈압' 키워드를 포함하지 않고 패턴 찾기)
-    bp_match = re.search(r'(\d+)/(\d+)\s*mmHg', text)
+    # 혈압 파싱 (이미지에 '139 / 89 mmHg' 패턴이 명확하므로 이에 맞춤)
+    bp_match = re.search(r'(\d+)\s*/\s*(\d+)\s*mmHg', text)
     if bp_match:
         data['수축기 혈압'] = int(bp_match.group(1))
         data['이완기 혈압'] = int(bp_match.group(2))
     else:
-        data['수축기 혈압'] = None
-        data['이완기 혈압'] = None
+        # '고혈압' 키워드와 함께 패턴을 찾는 경우
+        bp_match_with_label = re.search(r'고혈압.*?(\d+)\s*/\s*(\d+)\s*mmHg', text, re.DOTALL)
+        if bp_match_with_label:
+            data['수축기 혈압'] = int(bp_match_with_label.group(1))
+            data['이완기 혈압'] = int(bp_match_with_label.group(2))
+        else:
+            data['수축기 혈압'] = None
+            data['이완기 혈압'] = None
 
+    # 기타 혈액 검사 및 기능 검사 결과 파싱
     patterns = {
         '혈색소': r'혈색소\(g/dL\)\s*(\d+(\.\d+)?)',
         '공복 혈당': r'공복혈당\(mg/dL\)\s*(\d+(\.\d+)?)',
@@ -79,7 +105,7 @@ def parse_health_data_from_ocr(text):
         'AST': r'AST\(SGOT\)\(IU/L\)\s*(\d+(\.\d+)?)',
         'ALT': r'ALT\(SGPT\)\(IU/L\)\s*(\d+(\.\d+)?)',
         '감마지티피': r'감마지티피\(XGTP\)\(IU/L\)\s*(\d+(\.\d+)?)',
-        '요단백': r'요단백\s*([가-힣]+)',
+        '요단백': r'요단백\s*([가-힣]+)', # '정상', '경계', '단백뇨 의심' 등
         '흡연 상태': None,
         '음주 여부': None
     }
@@ -96,19 +122,11 @@ def parse_health_data_from_ocr(text):
                 data[key] = float(value_str)
             except ValueError:
                 data[key] = value_str.strip()
-            except IndexError:
-                try:
-                    start_index = match.end()
-                    rest_of_text = text[start_index:].splitlines()[0].strip()
-                    num_match = re.search(r'\d+(\.\d+)?', rest_of_text)
-                    if num_match:
-                        data[key] = float(num_match.group(0))
-                    else:
-                        data[key] = None
-                except Exception:
-                    data[key] = None
+            except IndexError: # 이 블록은 거의 실행되지 않음
+                data[key] = None # 매칭되었으나 값 추출 실패 시 None
         else:
-            data[key] = None
+            data[key] = None # 패턴을 찾지 못한 경우 None
+
     return data
 
 # --- 피처 엔지니어링 및 전처리 함수 ---
@@ -130,7 +148,7 @@ def preprocess_and_engineer_features(raw_data):
     else:
         processed_data['성별코드'] = np.nan
 
-    processed_data['흡연상태'] = 1 # 예시로 비흡연자(1) 설정
+    processed_data['흡연상태'] = 1 # 예시로 비흡연자(1) 설정 (OCR에서 추출이 어렵기 때문)
 
     age = raw_data.get('나이')
     if age is not None:
@@ -138,8 +156,7 @@ def preprocess_and_engineer_features(raw_data):
     else:
         processed_data['연령대코드(5세단위)'] = np.nan
 
-    # 시력(평균)은 OCR에서 추출되지 않으므로 NaN 처리
-    processed_data['시력(평균)'] = np.nan
+    processed_data['시력(평균)'] = np.nan # OCR에서 추출되지 않으므로 NaN 처리
 
     height = raw_data.get('신장')
     weight = raw_data.get('체중')
@@ -149,35 +166,36 @@ def preprocess_and_engineer_features(raw_data):
         processed_data['bmi'] = np.nan
 
     # 파생 변수 계산
-    alt = processed_data.get('alt') if processed_data.get('alt') is not None else raw_data.get('ALT')
-    ast = processed_data.get('ast') if processed_data.get('ast') is not None else raw_data.get('AST')
+    alt = raw_data.get('ALT')
+    ast = raw_data.get('AST')
     if alt is not None and ast is not None and ast != 0:
         processed_data['alt_ast_ratio'] = alt / ast
     else:
         processed_data['alt_ast_ratio'] = np.nan
 
-    triglycerides = processed_data.get('triglycerides') if processed_data.get('triglycerides') is not None else raw_data.get('트리글리세라이드')
-    hdl = processed_data.get('hdl_cholesterol') if processed_data.get('hdl_cholesterol') is not None else raw_data.get('HDL 콜레스테롤')
+    triglycerides = raw_data.get('트리글리세라이드')
+    hdl = raw_data.get('HDL 콜레스테롤')
     if triglycerides is not None and hdl is not None and hdl != 0:
         processed_data['tg_hdl_ratio'] = triglycerides / hdl
     else:
         processed_data['tg_hdl_ratio'] = np.nan
 
-    ggtp = processed_data.get('gamma_gtp') if processed_data.get('gamma_gtp') is not None else raw_data.get('감마지티피')
-    alt = processed_data.get('alt') if processed_data.get('alt') is not None else raw_data.get('ALT')
+    ggtp = raw_data.get('감마지티피')
+    alt = raw_data.get('ALT')
     if ggtp is not None and alt is not None and alt != 0:
         processed_data['ggtp_alt_ratio'] = ggtp / alt
     else:
         processed_data['ggtp_alt_ratio'] = np.nan
 
-    ldl = processed_data.get('ldl_cholesterol') if processed_data.get('ldl_cholesterol') is not None else raw_data.get('LDL 콜레스테롤')
-    hdl = processed_data.get('hdl_cholesterol') if processed_data.get('hdl_cholesterol') is not None else raw_data.get('HDL 콜레스테롤')
+    ldl = raw_data.get('LDL 콜레스테롤')
+    hdl = raw_data.get('HDL 콜레스테롤')
     if ldl is not None and hdl is not None and hdl != 0:
         processed_data['ldl_hdl_ratio'] = ldl / hdl
     else:
         processed_data['ldl_hdl_ratio'] = np.nan
 
     # `04_modeling.ipynb`의 `df.columns`에서 확인된 피처 리스트 (타겟 제외)
+    # 이 리스트는 모델 학습에 사용된 최종 피처 순서와 동일해야 함
     required_features_from_notebook = [
         '성별코드', '연령대코드(5세단위)', '시력(평균)', '식전혈당(공복혈당)', '총콜레스테롤', '혈색소', '요단백',
         '혈청크레아티닌', '감마지티피', '흡연상태', '음주여부', 'bmi', 'alt_ast_ratio',
@@ -186,22 +204,27 @@ def preprocess_and_engineer_features(raw_data):
 
     for feature in required_features_from_notebook:
         if feature not in processed_data:
+            # '요단백'은 문자열이므로 None, 나머지는 np.nan
             if feature == '요단백':
                 processed_data[feature] = None
             elif feature == '음주여부':
-                processed_data[feature] = None
+                processed_data[feature] = None # 음주여부는 OCR에서 추출 어려움
+            elif feature == '흡연상태':
+                processed_data[feature] = 1 # 흡연상태도 OCR에서 추출 어려움, 기본값 1 (비흡연)
             else:
                 processed_data[feature] = np.nan
 
     # '요단백' 값을 모델에 맞게 변환 (정상 -> 0)
+    # preprocess_and_engineer_features 함수 마지막에서 다시 한번 확인 및 변환
     if processed_data.get('요단백') == '정상':
         processed_data['요단백'] = 0
     else:
         processed_data['요단백'] = np.nan
 
+
     return processed_data
 
-def prepare_model_input(processed_data, model_features_order):
+def prepare_model_input(processed_data):
     df_sample = pd.DataFrame([processed_data])
 
     try:
@@ -223,7 +246,7 @@ def prepare_model_input(processed_data, model_features_order):
     except KeyError as e:
         st.error(f"오류: 모델에 필요한 피처가 데이터에 없습니다: {e}")
         st.write(f"데이터에 있는 피처: {df_sample.columns.tolist()}")
-        st.write(f"예상되는 피처 순서 (numeric_features): {model_features_order}")
+        st.write(f"예상되는 피처 순서 (numeric_features): {numeric_features}")
         return None
     except Exception as e:
         st.error(f"모델 입력 데이터 준비 중 오류 발생: {e}")
@@ -233,8 +256,6 @@ def classify_risk_level(prediction_proba):
     if prediction_proba is None:
         return "분류 불가"
 
-    # 04_modeling.ipynb에서 Threshold 0.48로 조정되었으므로, 이를 반영하여 분류
-    # 이 분류 로직은 예측 확률을 4단계로 나누는 것이므로, 0.48은 '정상'과 '주의'를 나누는 기준으로만 적용
     if prediction_proba < 0.48:
         return "정상"
     elif prediction_proba <= 0.59:
@@ -243,11 +264,6 @@ def classify_risk_level(prediction_proba):
         return "위험"
     else:
         return "고위험"
-
-# 모델 학습 시 사용된 최종 피처 목록 및 순서는 `prepare_model_input` 내 `numeric_features`에 명시됨
-# 이 변수는 이제 사용되지 않으므로 제거합니다.
-# model_features_order = [...]
-
 
 # --- Streamlit 앱 메인 로직 ---
 st.title("Google Cloud Vision API를 이용한 이미지 건강 데이터 추출 및 분석")
@@ -307,10 +323,9 @@ if uploaded_file is not None and vision_client is not None:
             st.json(processed_health_data)
 
             st.subheader("4. 모델 입력 데이터 준비:")
-            # model_features_order 변수 제거
-            model_input_df = prepare_model_input(processed_health_data, []) # model_features_order는 이제 prepare_model_input 내부에서 정의
+            model_input_df = prepare_model_input(processed_health_data)
 
-            if model_input_df is not None and not model_input_df.empty: # DataFrame이 비어있지 않은지 확인
+            if model_input_df is not None and not model_input_df.empty:
                 st.dataframe(model_input_df)
 
                 st.subheader("5. 고혈압 위험 예측:")
@@ -323,7 +338,6 @@ if uploaded_file is not None and vision_client is not None:
                         risk_level = classify_risk_level(prediction_proba[0])
                         st.write(f"고혈압 위험 등급: **{risk_level}**")
 
-                        # 예측 결과를 session_state에 저장하여 page_2.py로 전달
                         st.session_state['prediction_proba'] = prediction_proba[0]
                         st.session_state['risk_level'] = risk_level
 
@@ -347,6 +361,3 @@ if uploaded_file is not None and vision_client is not None:
 
 st.markdown("---")
 st.write("이 애플리케이션은 Google Cloud Vision API 및 제공된 데이터 처리 로직을 사용합니다.")
-
-# 임시 인증 파일 삭제 (app.py에서 처리되므로 여기서는 제거)
-# if temp_credentials_path and os.path.exists(temp_credentials_path): ...
