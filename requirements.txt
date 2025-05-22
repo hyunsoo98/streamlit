@@ -46,3 +46,4 @@ pandas
 numpy
 bcrypt
 joblib
+scikit-learn
