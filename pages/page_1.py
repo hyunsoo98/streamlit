@@ -24,42 +24,40 @@ if vision_client is None:
 # --- 텍스트 파싱 함수 ---
 def parse_health_data_from_ocr(text):
     data = {}
+    lines = text.split('\n') # 텍스트를 줄 단위로 분리합니다.
 
-    # --- 나이 파싱 개선 ---
-    # 패턴 1: '나이' 키워드 뒤에 바로 숫자 (공백 또는 줄바꿈 포함)
-    age_match_1 = re.search(r'나이\s*(\d+)', text, re.DOTALL)
-    # 패턴 2: '나이' 키워드와 숫자 사이에 줄바꿈이 있는 경우
-    age_match_2 = re.search(r'나이\s*\n\s*(\d+)', text, re.DOTALL)
-    # 패턴 3: OCR이 표를 완전히 분리하여 숫자만 남긴 경우 (흔치 않지만 대비)
-    # 예: OCR 결과에 '45'만 따로 큰 글씨로 인식될 가능성
-    # 이 패턴은 다른 숫자를 오인식할 위험이 있으므로, 특정 영역에서만 적용하거나 신중해야 함
-    # age_match_3 = re.search(r'\b(\d{1,3})\b', text) # 단독으로 숫자만 있을 때
+    # --- 나이 및 성별 파싱 개선 ---
+    age_index = -1
+    gender_index = -1
 
-    if age_match_1:
-        data['나이'] = int(age_match_1.group(1))
-    elif age_match_2:
-        data['나이'] = int(age_match_2.group(1))
+    # '나이'와 '성별' 레이블의 줄 인덱스를 찾습니다.
+    for i, line in enumerate(lines):
+        if '나이' in line.strip():
+            age_index = i
+        if '성별' in line.strip():
+            gender_index = i
+
+    # 나이 값 파싱
+    if age_index != -1 and (age_index + 1) < len(lines):
+        age_value_line = lines[age_index + 1].strip()
+        age_match = re.search(r'(\d+)', age_value_line)
+        if age_match:
+            data['나이'] = int(age_match.group(1))
+        else:
+            data['나이'] = None
     else:
         data['나이'] = None
 
-    # --- 성별 파싱 개선 ---
-    # 패턴 1: '성별' 키워드 뒤에 '여성' 또는 '남성' (공백 또는 줄바꿈 포함)
-    gender_match_1 = re.search(r'성별\s*(여성|남성)', text, re.DOTALL)
-    # 패턴 2: '성별' 키워드와 값 사이에 줄바꿈이 있는 경우
-    gender_match_2 = re.search(r'성별\s*\n\s*(여성|남성)', text, re.DOTALL)
-
-    if gender_match_1:
-        data['성별'] = gender_match_1.group(1).strip()
-    elif gender_match_2:
-        data['성별'] = gender_match_2.group(1).strip()
-    else:
-        # OCR이 '여성' 또는 '남성'만 단독으로 인식할 가능성
-        # 예를 들어, OCR 텍스트에 '여성' 이나 '남성' 이라는 단어가 단독으로 나타날 때
-        isolated_gender_match = re.search(r'\b(여성|남성)\b', text)
-        if isolated_gender_match:
-            data['성별'] = isolated_gender_match.group(1).strip()
+    # 성별 값 파싱
+    if gender_index != -1 and (gender_index + 1) < len(lines):
+        gender_value_line = lines[gender_index + 1].strip()
+        gender_match = re.search(r'(여성|남성)', gender_value_line)
+        if gender_match:
+            data['성별'] = gender_match.group(1).strip()
         else:
             data['성별'] = None
+    else:
+        data['성별'] = None
     # ---------------------------
 
     # 키 및 몸무게 파싱 (이미지에 '155(cm)/70(kg)' 패턴이 명확하므로 이에 맞춤)
@@ -122,11 +120,10 @@ def parse_health_data_from_ocr(text):
                 data[key] = float(value_str)
             except ValueError:
                 data[key] = value_str.strip()
-            except IndexError: # 이 블록은 거의 실행되지 않음
-                data[key] = None # 매칭되었으나 값 추출 실패 시 None
+            except IndexError:
+                data[key] = None
         else:
-            data[key] = None # 패턴을 찾지 못한 경우 None
-
+            data[key] = None
     return data
 
 # --- 피처 엔지니어링 및 전처리 함수 ---
@@ -204,23 +201,19 @@ def preprocess_and_engineer_features(raw_data):
 
     for feature in required_features_from_notebook:
         if feature not in processed_data:
-            # '요단백'은 문자열이므로 None, 나머지는 np.nan
             if feature == '요단백':
                 processed_data[feature] = None
             elif feature == '음주여부':
-                processed_data[feature] = None # 음주여부는 OCR에서 추출 어려움
+                processed_data[feature] = None
             elif feature == '흡연상태':
-                processed_data[feature] = 1 # 흡연상태도 OCR에서 추출 어려움, 기본값 1 (비흡연)
+                processed_data[feature] = 1
             else:
                 processed_data[feature] = np.nan
 
-    # '요단백' 값을 모델에 맞게 변환 (정상 -> 0)
-    # preprocess_and_engineer_features 함수 마지막에서 다시 한번 확인 및 변환
     if processed_data.get('요단백') == '정상':
         processed_data['요단백'] = 0
     else:
         processed_data['요단백'] = np.nan
-
 
     return processed_data
 
@@ -228,8 +221,6 @@ def prepare_model_input(processed_data):
     df_sample = pd.DataFrame([processed_data])
 
     try:
-        # 04_modeling.ipynb의 `numeric_features` 정의를 참고하여 컬럼 선택
-        # 이들은 StandardScaler를 통과하는 피처들입니다.
         numeric_features = [
             '연령대코드(5세단위)', '시력(평균)', '식전혈당(공복혈당)', '혈색소', '요단백',
             '혈청크레아티닌', '감마지티피', 'bmi', 'alt_ast_ratio', 'tg_hdl_ratio',
